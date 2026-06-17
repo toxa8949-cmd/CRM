@@ -161,26 +161,26 @@ export default function IntakePage() {
                 const profit = priceNet ? priceNet - r.purchase - r.extra_cost - priceNet * 3 / 100 : 0;
                 return (
                 <tr key={i}>
-                  <td><input className="input" style={{ width: 110 }} value={r.code} onChange={e => upd(i, { code: e.target.value })} /></td>
-                  <td><input className="input" value={r.name} onChange={e => upd(i, { name: e.target.value })} /></td>
-                  <td>
+                  <td data-label="Код"><input className="input" style={{ width: 110 }} value={r.code} onChange={e => upd(i, { code: e.target.value })} /></td>
+                  <td data-label="Назва"><input className="input" value={r.name} onChange={e => upd(i, { name: e.target.value })} /></td>
+                  <td data-label="Категорія">
                     <select value={r.category_id} onChange={e => upd(i, { category_id: e.target.value })}>
                       <option value="">— без категорії</option>
                       {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
                   </td>
-                  <td><input className="input" type="number" style={{ width: 60 }} value={r.qty} onChange={e => upd(i, { qty: Number(e.target.value) })} /></td>
-                  <td>{money(r.purchase)}</td>
-                  <td>{r.extra_cost ? money(r.extra_cost) : '—'}</td>
-                  <td><input className="input" type="number" style={{ width: 110 }} placeholder="ціна з ПДВ" value={r.priceBrutto} onChange={e => upd(i, { priceBrutto: e.target.value })} /></td>
-                  <td className="muted">{r.priceBrutto ? money(priceNet) : '—'}</td>
-                  <td style={{ fontWeight: 600, color: profit > 0 ? '#16a34a' : profit < 0 ? '#dc2626' : '#9ca3af' }}>
+                  <td data-label="К-сть"><input className="input" type="number" style={{ width: 60 }} value={r.qty} onChange={e => upd(i, { qty: Number(e.target.value) })} /></td>
+                  <td data-label="Закупка нетто">{money(r.purchase)}</td>
+                  <td data-label="Доставка/од.">{r.extra_cost ? money(r.extra_cost) : '—'}</td>
+                  <td data-label="Продаж брутто"><input className="input" type="number" style={{ width: 110 }} placeholder="ціна з ПДВ" value={r.priceBrutto} onChange={e => upd(i, { priceBrutto: e.target.value })} /></td>
+                  <td data-label="Продаж нетто" className="muted">{r.priceBrutto ? money(priceNet) : '—'}</td>
+                  <td data-label="Чистий/од." style={{ fontWeight: 600, color: profit > 0 ? '#16a34a' : profit < 0 ? '#dc2626' : '#9ca3af' }}>
                     {r.priceBrutto ? money(profit) : '—'}
                   </td>
-                  <td>{r.matchId
+                  <td data-label="Склад">{r.matchId
                     ? <span className="badge ok" title={r.matchName}>+ до наявного</span>
                     : <span className="badge low">новий</span>}</td>
-                  <td><button className="danger" onClick={() => remove(i)}>🗑</button></td>
+                  <td className="actions" data-label="Дії"><button className="danger" onClick={() => remove(i)}>🗑</button></td>
                 </tr>
                 );
               })}

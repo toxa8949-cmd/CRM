@@ -187,19 +187,19 @@ export default function SalesPage() {
           {filtered.map(s => (
             <Fragment key={s.id}>
               <tr>
-                <td>{s.id}</td>
-                <td>{new Date(s.created_at).toLocaleString('uk-UA')}</td>
-                <td>{s.customers?.name || '—'}</td>
-                <td>{s.status === 'Повернення'
+                <td data-label="№">{s.id}</td>
+                <td data-label="Дата">{new Date(s.created_at).toLocaleString('uk-UA')}</td>
+                <td data-label="Клієнт">{s.customers?.name || '—'}</td>
+                <td data-label="Статус">{s.status === 'Повернення'
                   ? <span className="badge out">Повернення</span>
                   : <span className="badge ok">Завершено</span>}</td>
-                <td>{s.status === 'Повернення' ? '—' : payBadge(s)}</td>
-                <td>{money(s.total)}{s.discount > 0 && <div className="muted" style={{ fontSize: 12 }}>знижка −{money(s.discount)}</div>}</td>
-                <td style={{ color: (s.total - s.paid) > 0 ? '#dc2626' : '#9ca3af' }}>
+                <td data-label="Оплата">{s.status === 'Повернення' ? '—' : payBadge(s)}</td>
+                <td data-label="Сума">{money(s.total)}{s.discount > 0 && <div className="muted" style={{ fontSize: 12 }}>знижка −{money(s.discount)}</div>}</td>
+                <td data-label="Борг" style={{ color: (s.total - s.paid) > 0 ? '#dc2626' : '#9ca3af' }}>
                   {money(Math.max(0, s.total - s.paid))}
                 </td>
-                {owner && <td style={{ color: '#16a34a' }}>{money(s.profit)}</td>}
-                <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {owner && <td data-label="Прибуток" style={{ color: '#16a34a' }}>{money(s.profit)}</td>}
+                <td className="actions" data-label="Дії" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button className="ghost" onClick={() => setOpen(open === s.id ? null : s.id)}>
                     {open === s.id ? 'Сховати' : 'Деталі'}
                   </button>

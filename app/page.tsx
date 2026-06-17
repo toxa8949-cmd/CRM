@@ -168,10 +168,10 @@ export default function Dashboard() {
           {recent.length === 0 && <tr><td colSpan={owner ? 4 : 3} className="muted">Ще немає продажів</td></tr>}
           {recent.map(r => (
             <tr key={r.id}>
-              <td>{new Date(r.created_at).toLocaleString('uk-UA')}</td>
-              <td>{r.payment}</td>
-              <td>{money(r.total)}</td>
-              {owner && <td style={{ color: '#16a34a' }}>{money(r.profit)}</td>}
+              <td data-label="Дата">{new Date(r.created_at).toLocaleString('uk-UA')}</td>
+              <td data-label="Оплата">{r.payment}</td>
+              <td data-label="Сума">{money(r.total)}</td>
+              {owner && <td data-label="Прибуток" style={{ color: '#16a34a' }}>{money(r.profit)}</td>}
             </tr>
           ))}
         </tbody>

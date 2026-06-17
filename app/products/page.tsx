@@ -190,23 +190,23 @@ export default function ProductsPage() {
             </tr>
           ) : (
             <tr key={p.id}>
-              <td>
+              <td data-label="Назва">
                 <div style={{ fontWeight: 600 }}>{p.name}</div>
                 <div className="muted" style={{ fontSize: 12 }}>
                   {p.sku ? p.sku + ' · ' : ''}{p.kind === 'Послуга' ? 'Послуга 8%' : 'Товар 3%'}
                 </div>
               </td>
-              <td>{p.categories?.name || <span className="muted">—</span>}</td>
-              <td>{stockBadge(p)}</td>
-              {owner && <td>{money(p.purchase)}{p.extra_cost ? <div className="muted" style={{ fontSize: 11 }}>+{money(p.extra_cost)} дост.</div> : null}</td>}
-              <td>
+              <td data-label="Категорія">{p.categories?.name || <span className="muted">—</span>}</td>
+              <td data-label="Залишок">{stockBadge(p)}</td>
+              {owner && <td data-label="Закупка">{money(p.purchase)}{p.extra_cost ? <div className="muted" style={{ fontSize: 11 }}>+{money(p.extra_cost)} дост.</div> : null}</td>}
+              <td data-label="Ціна продажу">
                 <div style={{ fontWeight: 600 }}>{money(brutto(p.price))}</div>
                 <div className="muted" style={{ fontSize: 11 }}>{money(p.price)} нетто</div>
               </td>
-              {owner && <td style={{ color: '#16a34a', fontWeight: 600 }}>
+              {owner && <td data-label="Чистий/од." style={{ color: '#16a34a', fontWeight: 600 }}>
                 {money(p.price - p.purchase - (p.extra_cost || 0) - p.price * taxRate(p.kind) / 100)}
               </td>}
-              {owner && <td style={{ display: 'flex', gap: 6 }}>
+              {owner && <td className="actions" data-label="Дії" style={{ display: 'flex', gap: 6 }}>
                 <button className="ghost" onClick={() => receive(p)} title="Надходження">+склад</button>
                 <button className="ghost" onClick={() => startEdit(p)}>✎</button>
                 <button className="danger" onClick={() => del(p)}>🗑</button>

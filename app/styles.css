@@ -45,11 +45,66 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .ok-msg{background:#dcfce7;color:#166534;padding:10px 14px;border-radius:10px;margin-bottom:14px;font-size:14px}
 .loading{padding:40px;text-align:center;color:#6b7280}
 a.link{color:#2563eb;cursor:pointer}
+/* ===== Планшет ===== */
 @media(max-width:860px){
-  body{display:block}.sidebar{position:static;width:auto;min-height:auto}
-  .sidebar nav{flex-direction:row;flex-wrap:wrap}.sidebar a{flex:1 1 auto}
-  .content{margin-left:0;width:100%;padding:16px}.pos{grid-template-columns:1fr}
+  body{display:block}
+  .sidebar{position:sticky;top:0;z-index:50;width:auto;min-height:auto;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .sidebar h1{font-size:18px;margin:0;white-space:nowrap}
+  .sidebar nav{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;gap:6px;flex:1;-webkit-overflow-scrolling:touch}
+  .sidebar nav::-webkit-scrollbar{display:none}
+  .sidebar a{flex:0 0 auto;padding:8px 12px;font-size:14px;white-space:nowrap}
+  .side-user{margin-top:0;padding-top:0;border-top:0;display:flex;align-items:center;gap:8px;flex:0 0 auto}
+  .side-user .muted,.side-user div{display:none}
+  .side-user button{margin-top:0!important;width:auto!important;padding:8px 12px}
+  .content{margin-left:0;width:100%;padding:16px}
+  .pos{grid-template-columns:1fr}
   .dash-hero{flex-direction:column}.dash-cols{grid-template-columns:1fr}
+}
+
+/* ===== Телефон ===== */
+@media(max-width:560px){
+  .content{padding:12px}
+  h2{font-size:20px}
+  .grid{grid-template-columns:1fr 1fr;gap:10px}
+  .card{padding:14px;border-radius:13px}
+  .value{font-size:21px}
+  .card h3{font-size:11px}
+  .hero-value{font-size:32px!important}
+  .form{grid-template-columns:1fr;padding:14px;gap:10px}
+  .row{gap:8px}
+  .row .input,.row select{max-width:100%!important;flex:1 1 100%}
+  .row button{flex:1 1 auto}
+
+  /* Кнопки дій крупніші для пальця */
+  button,.btn{padding:11px 14px;font-size:15px}
+  .input,select{padding:13px;font-size:16px}  /* 16px = без авто-зуму на iOS */
+
+  /* ----- Таблиці → картки ----- */
+  table{box-shadow:none;background:transparent;border-radius:0}
+  table thead{display:none}
+  table tbody{display:block}
+  table tr{display:block;background:#fff;border-radius:14px;box-shadow:0 4px 14px rgba(0,0,0,.06);margin-bottom:12px;padding:12px 14px}
+  table tr:last-child td{border-bottom:1px solid #f1f5f9}
+  table td{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;border-bottom:1px solid #f5f6f8;text-align:right;font-size:14px}
+  table td:last-child{border-bottom:0}
+  /* підпис колонки зліва */
+  table td::before{content:attr(data-label);color:#6b7280;font-size:12px;font-weight:600;text-align:left;flex:0 0 auto}
+  table td:empty{display:none}
+  /* комірки з кнопками — на всю ширину, кнопки крупні */
+  table td.actions{justify-content:flex-start;flex-wrap:wrap}
+  table td.actions::before{width:100%;margin-bottom:4px}
+  table td.actions button{flex:1 1 auto;min-width:64px}
+  /* інпути всередині карткових клітинок — на всю ширину */
+  table td .input,table td input,table td select{width:100%!important;max-width:100%!important;flex:1}
+
+  /* POS / Каса */
+  .cart{position:static;margin-top:14px}
+  .pos .list{max-height:none}
+  .qbtn{width:34px;height:34px;font-size:18px}
+  .total{font-size:22px}
+
+  /* Графік на панелі */
+  .bars{height:130px}
 }
 
 /* ---- Панель ---- */

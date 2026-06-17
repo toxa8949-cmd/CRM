@@ -50,9 +50,9 @@ export default function SettingsPage() {
           {cats.length === 0 && <tr><td colSpan={3} className="muted">Немає категорій</td></tr>}
           {cats.map(c => (
             <tr key={c.id}>
-              <td>{c.name}</td>
-              <td>{c.count}</td>
-              <td><button className="danger" onClick={() => del(c)}>🗑</button></td>
+              <td data-label="Категорія">{c.name}</td>
+              <td data-label="Товарів">{c.count}</td>
+              <td className="actions" data-label="Дії"><button className="danger" onClick={() => del(c)}>🗑</button></td>
             </tr>
           ))}
         </tbody>

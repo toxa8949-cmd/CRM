@@ -88,12 +88,12 @@ export default function CustomersPage() {
             </tr>
           ) : (
             <tr key={c.id}>
-              <td>{c.name}{c.note && <div className="muted" style={{ fontSize: 12 }}>{c.note}</div>}</td>
-              <td>{c.phone || '—'}</td>
-              <td>{c.email || '—'}</td>
-              <td>{c.orders}</td>
-              <td>{money(c.spent)}</td>
-              <td style={{ display: 'flex', gap: 6 }}>
+              <td data-label="Ім'я">{c.name}{c.note && <div className="muted" style={{ fontSize: 12 }}>{c.note}</div>}</td>
+              <td data-label="Телефон">{c.phone || '—'}</td>
+              <td data-label="Email">{c.email || '—'}</td>
+              <td data-label="Замовлень">{c.orders}</td>
+              <td data-label="Витрачено">{money(c.spent)}</td>
+              <td className="actions" data-label="Дії" style={{ display: 'flex', gap: 6 }}>
                 <button className="ghost" onClick={() => setEdit(c)}>✎</button>
                 <button className="danger" onClick={() => del(c)}>🗑</button>
               </td>

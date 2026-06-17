@@ -100,7 +100,7 @@ export default function ReportsPage() {
             ))}
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 20 }}>
+          <div className="dash-cols">
             <div>
               <h3>Топ товарів</h3>
               <table>
@@ -108,7 +108,7 @@ export default function ReportsPage() {
                 <tbody>
                   {data.top.length === 0 && <tr><td colSpan={4} className="muted">Немає даних</td></tr>}
                   {data.top.map((t: any) => (
-                    <tr key={t.name}><td>{t.name}</td><td>{t.qty}</td><td>{money(t.sum)}</td><td style={{ color: '#16a34a' }}>{money(t.profit)}</td></tr>
+                    <tr key={t.name}><td data-label="Товар">{t.name}</td><td data-label="К-сть">{t.qty}</td><td data-label="Сума">{money(t.sum)}</td><td data-label="Прибуток" style={{ color: '#16a34a' }}>{money(t.profit)}</td></tr>
                   ))}
                 </tbody>
               </table>
@@ -120,7 +120,7 @@ export default function ReportsPage() {
                 <tbody>
                   {data.byCat.length === 0 && <tr><td colSpan={2} className="muted">Немає даних</td></tr>}
                   {data.byCat.map((c: any) => (
-                    <tr key={c.category}><td><span className="tag">{c.category}</span></td><td style={{ color: '#dc2626' }}>{money(c.amount)}</td></tr>
+                    <tr key={c.category}><td data-label="Категорія"><span className="tag">{c.category}</span></td><td data-label="Сума" style={{ color: '#dc2626' }}>{money(c.amount)}</td></tr>
                   ))}
                 </tbody>
               </table>

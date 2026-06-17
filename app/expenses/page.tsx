@@ -96,11 +96,11 @@ export default function ExpensesPage() {
             </tr>
           ) : (
             <tr key={e.id}>
-              <td>{e.spent_at}</td>
-              <td><span className="tag">{e.category}</span></td>
-              <td style={{ color: '#dc2626' }}>{money(e.amount)}</td>
-              <td>{e.description || '—'}</td>
-              <td style={{ display: 'flex', gap: 6 }}>
+              <td data-label="Дата">{e.spent_at}</td>
+              <td data-label="Категорія"><span className="tag">{e.category}</span></td>
+              <td data-label="Сума" style={{ color: '#dc2626' }}>{money(e.amount)}</td>
+              <td data-label="Опис">{e.description || '—'}</td>
+              <td className="actions" data-label="Дії" style={{ display: 'flex', gap: 6 }}>
                 <button className="ghost" onClick={() => setEdit(e)}>✎</button>
                 <button className="danger" onClick={() => del(e)}>🗑</button>
               </td>
