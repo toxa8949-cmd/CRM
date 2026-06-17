@@ -29,15 +29,8 @@ export default function SalesPage() {
   async function refund(s: Sale) {
     if (s.status === 'Повернення') return;
     if (!confirm(`Оформити повернення чеку #${s.id}? Товар повернеться на склад.`)) return;
-    for (const it of s.sale_items || []) {
-      if (!it.product_id) continue;
-      const { data: p } = await supabase.from('products').select('stock').eq('id', it.product_id).single();
-      if (p) {
-        await supabase.from('products').update({ stock: p.stock + it.qty }).eq('id', it.product_id);
-        await supabase.from('stock_moves').insert({ product_id: it.product_id, delta: it.qty, reason: 'Повернення' });
-      }
-    }
-    await supabase.from('sales').update({ status: 'Повернення', total: 0, profit: 0 }).eq('id', s.id);
+    const { error } = await supabase.rpc('refund_sale', { p_sale_id: s.id });
+    if (error) { alert(error.message); return; }
     load();
   }
 

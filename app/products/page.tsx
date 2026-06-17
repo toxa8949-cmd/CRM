@@ -54,9 +54,12 @@ export default function ProductsPage() {
 
   async function receive(p: Product) {
     const qty = Number(prompt(`Надходження "${p.name}". Скільки додати на склад?`, '1'));
-    if (!qty) return;
-    await supabase.from('products').update({ stock: p.stock + qty }).eq('id', p.id);
-    await supabase.from('stock_moves').insert({ product_id: p.id, delta: qty, reason: 'Надходження' });
+    if (!qty || qty <= 0) return;
+    const pur = Number(prompt(`Закупка нетто за одиницю (партія FIFO):`, String(p.purchase)));
+    if (pur < 0 || isNaN(pur)) return;
+    await supabase.rpc('receive_stock', {
+      p_product_id: p.id, p_qty: qty, p_purchase: pur, p_extra_cost: 0,
+    });
     load();
   }
 

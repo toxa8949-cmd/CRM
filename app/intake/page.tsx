@@ -83,25 +83,29 @@ export default function IntakePage() {
         const priceNet = Math.round(net(Number(r.priceBrutto)) * 100) / 100; // у базі зберігаємо нетто
         const catId = r.category_id ? Number(r.category_id) : null;
         if (r.matchId) {
-          // оновити існуючий: додати кількість, оновити закупку/ціни/категорію
-          const { data: p } = await supabase.from('products').select('stock').eq('id', r.matchId).single();
+          // існуючий: оновлюємо ціну/категорію (закупку НЕ перезаписуємо — вона в партіях),
+          // та price довідково оновлюємо на нову
           await supabase.from('products').update({
-            stock: (p?.stock || 0) + r.qty,
-            purchase: r.purchase,
-            extra_cost: r.extra_cost,
             price: priceNet,
             category_id: catId,
           }).eq('id', r.matchId);
-          await supabase.from('stock_moves').insert({ product_id: r.matchId, delta: r.qty, reason: 'Прихід (фактура)' });
+          // нова партія + склад (FIFO)
+          await supabase.rpc('receive_stock', {
+            p_product_id: r.matchId, p_qty: r.qty,
+            p_purchase: r.purchase, p_extra_cost: r.extra_cost,
+          });
         } else {
-          // створити новий товар
+          // створити новий товар (без складу — склад через партію)
           const { data: created } = await supabase.from('products').insert({
-            name: r.name, sku: r.code || null, stock: r.qty,
+            name: r.name, sku: r.code || null, stock: 0,
             purchase: r.purchase, extra_cost: r.extra_cost, price: priceNet,
             kind: 'Товар', category_id: catId,
           }).select('id').single();
           if (created) {
-            await supabase.from('stock_moves').insert({ product_id: created.id, delta: r.qty, reason: 'Прихід (фактура)' });
+            await supabase.rpc('receive_stock', {
+              p_product_id: created.id, p_qty: r.qty,
+              p_purchase: r.purchase, p_extra_cost: r.extra_cost,
+            });
           }
         }
       }
