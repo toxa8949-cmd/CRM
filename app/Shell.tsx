@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { AuthProvider, useAuth } from '../lib/auth';
 
@@ -25,6 +25,9 @@ function Inner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const isLogin = pathname === '/login';
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
 
   useEffect(() => {
     if (!ready) return;
@@ -47,7 +50,19 @@ function Inner({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <aside className="sidebar">
+      {/* Мобільний топбар (видно тільки на телефоні через CSS) */}
+      <header className="topbar">
+        <button className="burger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Меню">
+          {menuOpen ? '✕' : '☰'}
+        </button>
+        <span className="topbar-title">Rower CRM</span>
+        <button className="ghost topbar-exit" onClick={logout}>Вийти</button>
+      </header>
+
+      {/* Затемнення під меню */}
+      {menuOpen && <div className="menu-overlay" onClick={() => setMenuOpen(false)} />}
+
+      <aside className={'sidebar' + (menuOpen ? ' open' : '')}>
         <h1>Rower CRM</h1>
         <nav>
           {items.map(n => (
