@@ -22,6 +22,7 @@ export default function PosPage() {
   const [discount, setDiscount] = useState('');
   const [paid, setPaid] = useState('');
   const [partial, setPartial] = useState(false);
+  const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
   const [busy, setBusy] = useState(false);
@@ -102,6 +103,8 @@ export default function PosPage() {
   async function checkout() {
     if (cart.length === 0 && services.length === 0) return;
     setBusy(true); setErr(''); setOk('');
+    const today = new Date().toISOString().slice(0, 10);
+    const pDate = saleDate && saleDate !== today ? `${saleDate}T12:00:00` : null;
     const { error } = await supabase.rpc('create_sale', {
       p_items: cart.map(c => ({ product_id: c.product.id, qty: c.qty })),
       p_services: services.map(s => ({ description: s.description, brutto: s.brutto })),
@@ -110,12 +113,14 @@ export default function PosPage() {
       p_note: note || null,
       p_discount: disc,
       p_paid: partial ? paidNum : null,
+      p_date: pDate,
     });
     setBusy(false);
     if (error) return setErr(error.message);
     setOk(`Продаж оформлено на ${money(total)}${debt > 0 ? ` · борг ${money(debt)}` : ''}`);
     setCart([]); setServices([]); setNote(''); setCustomer('');
     setDiscount(''); setPaid(''); setPartial(false);
+    setSaleDate(new Date().toISOString().slice(0, 10));
     load();
   }
 
@@ -214,6 +219,9 @@ export default function PosPage() {
             <option value="">Без клієнта</option>
             {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          <label className="muted" style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>Дата продажу</label>
+          <input className="input" type="date" value={saleDate} max={new Date().toISOString().slice(0, 10)}
+            onChange={e => setSaleDate(e.target.value)} style={{ marginBottom: 10 }} />
           <select value={payment} onChange={e => setPayment(e.target.value)} style={{ marginBottom: 10 }}>
             <option>Готівка</option><option>Картка</option><option>Переказ</option><option>Накладений платіж</option>
           </select>
