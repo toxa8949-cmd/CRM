@@ -134,11 +134,14 @@ export default function IntakePage() {
             <thead>
               <tr>
                 <th>Код</th><th>Назва</th><th>К-сть</th><th>Закупка нетто</th><th>Доставка/од.</th>
-                <th>Продаж брутто</th><th>Продаж нетто</th><th>Склад</th><th></th>
+                <th>Продаж брутто</th><th>Продаж нетто</th><th>Чистий/од.</th><th>Склад</th><th></th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r, i) => (
+              {rows.map((r, i) => {
+                const priceNet = Number(r.priceBrutto) ? net(Number(r.priceBrutto)) : 0;
+                const profit = priceNet ? priceNet - r.purchase - r.extra_cost - priceNet * 3 / 100 : 0;
+                return (
                 <tr key={i}>
                   <td><input className="input" style={{ width: 110 }} value={r.code} onChange={e => upd(i, { code: e.target.value })} /></td>
                   <td><input className="input" value={r.name} onChange={e => upd(i, { name: e.target.value })} /></td>
@@ -146,13 +149,17 @@ export default function IntakePage() {
                   <td>{money(r.purchase)}</td>
                   <td>{r.extra_cost ? money(r.extra_cost) : '—'}</td>
                   <td><input className="input" type="number" style={{ width: 110 }} placeholder="ціна з ПДВ" value={r.priceBrutto} onChange={e => upd(i, { priceBrutto: e.target.value })} /></td>
-                  <td className="muted">{r.priceBrutto ? money(net(Number(r.priceBrutto))) : '—'}</td>
+                  <td className="muted">{r.priceBrutto ? money(priceNet) : '—'}</td>
+                  <td style={{ fontWeight: 600, color: profit > 0 ? '#16a34a' : profit < 0 ? '#dc2626' : '#9ca3af' }}>
+                    {r.priceBrutto ? money(profit) : '—'}
+                  </td>
                   <td>{r.matchId
                     ? <span className="badge ok" title={r.matchName}>+ до наявного</span>
                     : <span className="badge low">новий</span>}</td>
                   <td><button className="danger" onClick={() => remove(i)}>🗑</button></td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
 
