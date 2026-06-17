@@ -1,10 +1,13 @@
 'use client';
 import { useEffect, useState, Fragment } from 'react';
 import { supabase, money, exportCSV, type Sale } from '../../lib/supabase';
+import { useAuth } from '../../lib/auth';
 
 const PAYMENTS = ['Готівка', 'Картка', 'Переказ', 'Накладений платіж'];
 
 export default function SalesPage() {
+  const { role } = useAuth();
+  const owner = role === 'owner';
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<number | null>(null);
@@ -18,12 +21,34 @@ export default function SalesPage() {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase
-      .from('sales')
-      .select('*,customers(name),sale_items(*)')
-      .order('created_at', { ascending: false })
-      .limit(500);
-    setSales(data || []); setLoading(false);
+    if (owner) {
+      const { data } = await supabase
+        .from('sales')
+        .select('*,customers(name),sale_items(*)')
+        .order('created_at', { ascending: false })
+        .limit(500);
+      setSales(data || []);
+    } else {
+      // продавець: безпечні VIEW без прибутку/собівартості
+      const [{ data: s }, { data: items }, { data: custs }] = await Promise.all([
+        supabase.from('sales_safe').select('*').order('created_at', { ascending: false }).limit(500),
+        supabase.from('sale_items_safe').select('*'),
+        supabase.from('customers').select('id,name'),
+      ]);
+      const custMap = new Map((custs || []).map((c: any) => [c.id, c.name]));
+      const itemsBySale = new Map<number, any[]>();
+      (items || []).forEach((it: any) => {
+        if (!itemsBySale.has(it.sale_id)) itemsBySale.set(it.sale_id, []);
+        itemsBySale.get(it.sale_id)!.push(it);
+      });
+      const merged = (s || []).map((x: any) => ({
+        ...x,
+        customers: x.customer_id ? { name: custMap.get(x.customer_id) } : null,
+        sale_items: itemsBySale.get(x.id) || [],
+      }));
+      setSales(merged as any);
+    }
+    setLoading(false);
   }
 
   async function refund(s: Sale) {
@@ -90,21 +115,26 @@ export default function SalesPage() {
   }
 
   function exportSales() {
-    const rows = filtered.map(s => ({
-      '№': s.id,
-      'Дата': new Date(s.created_at).toLocaleString('uk-UA'),
-      'Клієнт': s.customers?.name || '',
-      'Статус': s.status,
-      'Оплата': s.pay_status,
-      'Спосіб': s.payment,
-      'Сума': Number(s.total).toFixed(2),
-      'Знижка': Number(s.discount).toFixed(2),
-      'Сплачено': Number(s.paid).toFixed(2),
-      'Борг': Math.max(0, s.total - s.paid).toFixed(2),
-      'Нетто': Number(s.net).toFixed(2),
-      'Податок з обороту': Number(s.turnover_tax).toFixed(2),
-      'Прибуток': Number(s.profit).toFixed(2),
-    }));
+    const rows = filtered.map(s => {
+      const base: any = {
+        '№': s.id,
+        'Дата': new Date(s.created_at).toLocaleString('uk-UA'),
+        'Клієнт': s.customers?.name || '',
+        'Статус': s.status,
+        'Оплата': s.pay_status,
+        'Спосіб': s.payment,
+        'Сума': Number(s.total).toFixed(2),
+        'Знижка': Number(s.discount).toFixed(2),
+        'Сплачено': Number(s.paid).toFixed(2),
+        'Борг': Math.max(0, s.total - s.paid).toFixed(2),
+      };
+      if (owner) {
+        base['Нетто'] = Number(s.net).toFixed(2);
+        base['Податок з обороту'] = Number(s.turnover_tax).toFixed(2);
+        base['Прибуток'] = Number(s.profit).toFixed(2);
+      }
+      return base;
+    });
     exportCSV(`prodazhi_${new Date().toISOString().slice(0, 10)}.csv`, rows);
   }
 
@@ -151,9 +181,9 @@ export default function SalesPage() {
       </div>
 
       <table>
-        <thead><tr><th>#</th><th>Дата</th><th>Клієнт</th><th>Статус</th><th>Оплата</th><th>Сума</th><th>Борг</th><th>Прибуток</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Дата</th><th>Клієнт</th><th>Статус</th><th>Оплата</th><th>Сума</th><th>Борг</th>{owner && <th>Прибуток</th>}<th></th></tr></thead>
         <tbody>
-          {filtered.length === 0 && <tr><td colSpan={9} className="muted">Нічого не знайдено</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan={owner ? 9 : 8} className="muted">Нічого не знайдено</td></tr>}
           {filtered.map(s => (
             <Fragment key={s.id}>
               <tr>
@@ -168,22 +198,22 @@ export default function SalesPage() {
                 <td style={{ color: (s.total - s.paid) > 0 ? '#dc2626' : '#9ca3af' }}>
                   {money(Math.max(0, s.total - s.paid))}
                 </td>
-                <td style={{ color: '#16a34a' }}>{money(s.profit)}</td>
+                {owner && <td style={{ color: '#16a34a' }}>{money(s.profit)}</td>}
                 <td style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <button className="ghost" onClick={() => setOpen(open === s.id ? null : s.id)}>
                     {open === s.id ? 'Сховати' : 'Деталі'}
                   </button>
                   <button className="ghost" onClick={() => printReceipt(s)}>🖨</button>
-                  {s.status !== 'Повернення' && <button className="ghost" onClick={() => setEdit(s)}>✎</button>}
-                  {s.status !== 'Повернення' && s.pay_status !== 'Оплачено' &&
+                  {owner && s.status !== 'Повернення' && <button className="ghost" onClick={() => setEdit(s)}>✎</button>}
+                  {owner && s.status !== 'Повернення' && s.pay_status !== 'Оплачено' &&
                     <button className="green" onClick={() => pay(s)}>Довнести</button>}
-                  {s.status !== 'Повернення' && <button className="danger" onClick={() => refund(s)}>Повернення</button>}
+                  {owner && s.status !== 'Повернення' && <button className="danger" onClick={() => refund(s)}>Повернення</button>}
                 </td>
               </tr>
 
               {edit?.id === s.id && (
                 <tr>
-                  <td colSpan={9} style={{ background: '#eef2ff' }}>
+                  <td colSpan={owner ? 9 : 8} style={{ background: '#eef2ff' }}>
                     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', padding: '6px 0' }}>
                       <select value={edit!.payment} onChange={e => setEdit({ ...edit!, payment: e.target.value })}>
                         {PAYMENTS.map(p => <option key={p}>{p}</option>)}
@@ -202,7 +232,7 @@ export default function SalesPage() {
 
               {open === s.id && (
                 <tr>
-                  <td colSpan={9} style={{ background: '#f9fafb' }}>
+                  <td colSpan={owner ? 9 : 8} style={{ background: '#f9fafb' }}>
                     {(s.sale_items || []).map((it: any) => (
                       <div key={it.id} style={{ padding: '4px 0' }}>
                         {it.item_kind === 'Сервіс' ? '🔧 ' : ''}{it.product_name}

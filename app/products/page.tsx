@@ -1,8 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase, money, brutto, net, taxRate, type Product, type Category } from '../../lib/supabase';
+import { useAuth } from '../../lib/auth';
 
 export default function ProductsPage() {
+  const { role } = useAuth();
+  const owner = role === 'owner';
   const [products, setProducts] = useState<Product[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,8 +23,9 @@ export default function ProductsPage() {
 
   async function load() {
     setLoading(true);
+    const tableP = owner ? 'products' : 'products_safe';
     const [{ data: p }, { data: c }] = await Promise.all([
-      supabase.from('products').select('*,categories(name)').order('name'),
+      supabase.from(tableP).select('*,categories(name)').order('name'),
       supabase.from('categories').select('*').order('name'),
     ]);
     setProducts(p || []); setCats(c || []); setLoading(false);
@@ -112,7 +116,7 @@ export default function ProductsPage() {
       {/* Підсумки */}
       <div className="grid">
         <div className="card"><h3>Позицій</h3><div className="value">{products.length}</div></div>
-        <div className="card"><h3>Вартість (закупка)</h3><div className="value">{money(totalPurchase)}</div></div>
+        {owner && <div className="card"><h3>Вартість (закупка)</h3><div className="value">{money(totalPurchase)}</div></div>}
         <div className="card"><h3>Вартість (роздріб)</h3><div className="value blue">{money(totalRetail)}</div></div>
         <div className="card"><h3>Закінчується / немає</h3>
           <div className="value"><span style={{ color: lowCount ? '#d97706' : '#9ca3af' }}>{lowCount}</span> <span className="muted">/</span> <span style={{ color: outCount ? '#dc2626' : '#9ca3af' }}>{outCount}</span></div>
@@ -133,9 +137,9 @@ export default function ProductsPage() {
           <option value="out">Немає</option>
         </select>
         <span className="muted">{filtered.length} поз.</span>
-        <button style={{ marginLeft: 'auto' }} onClick={() => setShowForm(!showForm)}>
+        {owner && <button style={{ marginLeft: 'auto' }} onClick={() => setShowForm(!showForm)}>
           {showForm ? '✕ Сховати' : '+ Додати товар'}
-        </button>
+        </button>}
       </div>
 
       {/* Форма додавання — згорнута */}
@@ -160,10 +164,10 @@ export default function ProductsPage() {
       )}
 
       <table style={{ marginTop: 16 }}>
-        <thead><tr><th>Назва</th><th>Категорія</th><th>Залишок</th><th>Закупка</th><th>Ціна продажу</th><th>Чистий/од.</th><th></th></tr></thead>
+        <thead><tr><th>Назва</th><th>Категорія</th><th>Залишок</th>{owner && <th>Закупка</th>}<th>Ціна продажу</th>{owner && <th>Чистий/од.</th>}{owner && <th></th>}</tr></thead>
         <tbody>
-          {filtered.length === 0 && <tr><td colSpan={7} className="muted">Нічого не знайдено</td></tr>}
-          {filtered.map(p => (edit && edit.id === p.id) ? (
+          {filtered.length === 0 && <tr><td colSpan={owner ? 7 : 4} className="muted">Нічого не знайдено</td></tr>}
+          {filtered.map(p => (owner && edit && edit.id === p.id) ? (
             <tr key={p.id}>
               <td><input className="input" value={edit!.name} onChange={e => setEdit({ ...edit!, name: e.target.value })} /></td>
               <td>
@@ -194,19 +198,19 @@ export default function ProductsPage() {
               </td>
               <td>{p.categories?.name || <span className="muted">—</span>}</td>
               <td>{stockBadge(p)}</td>
-              <td>{money(p.purchase)}{p.extra_cost ? <div className="muted" style={{ fontSize: 11 }}>+{money(p.extra_cost)} дост.</div> : null}</td>
+              {owner && <td>{money(p.purchase)}{p.extra_cost ? <div className="muted" style={{ fontSize: 11 }}>+{money(p.extra_cost)} дост.</div> : null}</td>}
               <td>
                 <div style={{ fontWeight: 600 }}>{money(brutto(p.price))}</div>
                 <div className="muted" style={{ fontSize: 11 }}>{money(p.price)} нетто</div>
               </td>
-              <td style={{ color: '#16a34a', fontWeight: 600 }}>
-                {money(p.price - p.purchase - p.extra_cost - p.price * taxRate(p.kind) / 100)}
-              </td>
-              <td style={{ display: 'flex', gap: 6 }}>
+              {owner && <td style={{ color: '#16a34a', fontWeight: 600 }}>
+                {money(p.price - p.purchase - (p.extra_cost || 0) - p.price * taxRate(p.kind) / 100)}
+              </td>}
+              {owner && <td style={{ display: 'flex', gap: 6 }}>
                 <button className="ghost" onClick={() => receive(p)} title="Надходження">+склад</button>
                 <button className="ghost" onClick={() => startEdit(p)}>✎</button>
                 <button className="danger" onClick={() => del(p)}>🗑</button>
-              </td>
+              </td>}
             </tr>
           ))}
         </tbody>

@@ -1,11 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase, money, brutto, taxRate, type Product, type Customer } from '../../lib/supabase';
+import { useAuth } from '../../lib/auth';
 
 type CartItem = { product: Product; qty: number };
 type ServiceItem = { description: string; brutto: number };
 
 export default function PosPage() {
+  const { role } = useAuth();
+  const owner = role === 'owner';
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -28,7 +31,7 @@ export default function PosPage() {
 
   async function load() {
     const [{ data: p }, { data: c }] = await Promise.all([
-      supabase.from('products').select('*,categories(name)').order('name'),
+      supabase.from(owner ? 'products' : 'products_safe').select('*,categories(name)').order('name'),
       supabase.from('customers').select('*').order('name'),
     ]);
     setProducts(p || []); setCustomers(c || []); setLoading(false);
@@ -191,7 +194,7 @@ export default function PosPage() {
             Нетто: {money(net)}<br />
             ПДВ 23%: {money(total - net)}<br />
             Податок з обороту: {money(turnoverTax)}<br />
-            <span style={{ color: '#16a34a', fontWeight: 600 }}>Чистий прибуток: {money(profit)}</span>
+            {owner && <span style={{ color: '#16a34a', fontWeight: 600 }}>Чистий прибуток: {money(profit)}</span>}
           </div>
 
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 10px', fontSize: 14, cursor: 'pointer' }}>

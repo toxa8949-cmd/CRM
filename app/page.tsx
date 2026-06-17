@@ -2,15 +2,18 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase, money, todayISO } from '../lib/supabase';
+import { useAuth } from '../lib/auth';
 
 export default function Dashboard() {
+  const { role, ready } = useAuth();
+  const owner = role === 'owner';
   const [loading, setLoading] = useState(true);
   const [stat, setStat] = useState<any>(null);
   const [recent, setRecent] = useState<any[]>([]);
   const [lowItems, setLowItems] = useState<any[]>([]);
   const [daily, setDaily] = useState<{ d: string; v: number }[]>([]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (ready) load(); }, [ready]);
 
   async function load() {
     setLoading(true);
@@ -18,17 +21,21 @@ export default function Dashboard() {
     const monthStart = today.slice(0, 8) + '01';
 
     const [{ data: sales }, { data: products }] = await Promise.all([
-      supabase.from('sales').select('total,net,turnover_tax,profit,paid,pay_status,status,created_at,id,payment').order('created_at', { ascending: false }),
-      supabase.from('products').select('id,name,stock,purchase,price,low_stock'),
+      owner
+        ? supabase.from('sales').select('total,net,turnover_tax,profit,paid,pay_status,status,created_at,id,payment').order('created_at', { ascending: false })
+        : supabase.from('sales_safe').select('total,paid,pay_status,status,created_at,id,payment').order('created_at', { ascending: false }),
+      owner
+        ? supabase.from('products').select('id,name,stock,purchase,price,low_stock')
+        : supabase.from('products_safe').select('id,name,stock,price,low_stock'),
     ]);
 
-    const s = (sales || []).filter(x => x.status !== 'Повернення');
+    const s = ((sales || []) as any[]).filter(x => x.status !== 'Повернення');
     const todayS = s.filter(x => x.created_at?.slice(0, 10) === today);
     const monthS = s.filter(x => x.created_at?.slice(0, 10) >= monthStart);
-    const p = products || [];
+    const p = (products || []) as any[];
 
     // борги (усі чеки, не лише місяць)
-    const debtList = (sales || []).filter(x => x.status !== 'Повернення' && (x.total - x.paid) > 0.01);
+    const debtList = ((sales || []) as any[]).filter(x => x.status !== 'Повернення' && (x.total - x.paid) > 0.01);
     const debtTotal = debtList.reduce((a, x) => a + (x.total - x.paid), 0);
 
     // продажі по днях місяця (для міні-графіка)
@@ -71,8 +78,8 @@ export default function Dashboard() {
       {/* Швидкі дії */}
       <div className="row" style={{ marginBottom: 20 }}>
         <Link href="/pos" className="btn green">🛒 Нова продажа</Link>
-        <Link href="/intake" className="btn">📥 Прихід товару</Link>
-        <Link href="/expenses" className="btn ghost">💸 Додати витрату</Link>
+        {owner && <Link href="/intake" className="btn">📥 Прихід товару</Link>}
+        {owner && <Link href="/expenses" className="btn ghost">💸 Додати витрату</Link>}
       </div>
 
       {/* СЬОГОДНІ — головний блок */}
@@ -80,21 +87,25 @@ export default function Dashboard() {
         <div className="hero-main">
           <div className="hero-label">Виручка сьогодні</div>
           <div className="hero-value">{money(stat.todayRevenue)}</div>
-          <div className="hero-sub">{stat.todayCount} продаж(ів) · прибуток <b style={{ color: '#4ade80' }}>{money(stat.todayProfit)}</b></div>
+          <div className="hero-sub">{stat.todayCount} продаж(ів){owner && <> · прибуток <b style={{ color: '#4ade80' }}>{money(stat.todayProfit)}</b></>}</div>
         </div>
         <div className="hero-side">
           <div className="hero-mini">
             <span>Дохід за місяць</span>
             <b>{money(stat.monthRevenue)}</b>
           </div>
-          <div className="hero-mini">
+          {owner && <div className="hero-mini">
             <span>Прибуток за місяць</span>
             <b style={{ color: '#16a34a' }}>{money(stat.monthProfit)}</b>
-          </div>
-          <div className="hero-mini">
+          </div>}
+          {owner && <div className="hero-mini">
             <span>Податок з обороту (міс.)</span>
             <b>{money(stat.monthTax)}</b>
-          </div>
+          </div>}
+          {!owner && <div className="hero-mini">
+            <span>Продажів за місяць</span>
+            <b>{stat.monthCount}</b>
+          </div>}
         </div>
       </div>
 
@@ -115,7 +126,7 @@ export default function Dashboard() {
               <span className="muted">{lowItems.map(i => i.name).slice(0, 2).join(', ')}{stat.lowStock > 2 ? '…' : ''}</span>
             </Link>
           )}
-          {stat.noPrice > 0 && (
+          {owner && stat.noPrice > 0 && (
             <Link href="/products" className="card alert" style={{ textDecoration: 'none', color: 'inherit' }}>
               <h3>⚠️ Без ціни продажу</h3>
               <div className="value" style={{ color: '#d97706' }}>{stat.noPrice} поз.</div>
@@ -142,9 +153,9 @@ export default function Dashboard() {
 
         <div className="card">
           <h3>Склад</h3>
-          <div className="stock-row"><span>Закупівельна вартість</span><b>{money(stat.stockValue)}</b></div>
+          {owner && <div className="stock-row"><span>Закупівельна вартість</span><b>{money(stat.stockValue)}</b></div>}
           <div className="stock-row"><span>Роздрібна вартість</span><b>{money(stat.stockRetail)}</b></div>
-          <div className="stock-row"><span>Потенційний прибуток</span><b style={{ color: '#16a34a' }}>{money(stat.stockRetail - stat.stockValue)}</b></div>
+          {owner && <div className="stock-row"><span>Потенційний прибуток</span><b style={{ color: '#16a34a' }}>{money(stat.stockRetail - stat.stockValue)}</b></div>}
           <div className="stock-row"><span>Позицій у каталозі</span><b>{stat.products}</b></div>
         </div>
       </div>
@@ -152,15 +163,15 @@ export default function Dashboard() {
       {/* Останні продажі */}
       <h3 style={{ marginTop: 8 }}>Останні продажі</h3>
       <table>
-        <thead><tr><th>Дата</th><th>Оплата</th><th>Сума</th><th>Прибуток</th></tr></thead>
+        <thead><tr><th>Дата</th><th>Оплата</th><th>Сума</th>{owner && <th>Прибуток</th>}</tr></thead>
         <tbody>
-          {recent.length === 0 && <tr><td colSpan={4} className="muted">Ще немає продажів</td></tr>}
+          {recent.length === 0 && <tr><td colSpan={owner ? 4 : 3} className="muted">Ще немає продажів</td></tr>}
           {recent.map(r => (
             <tr key={r.id}>
               <td>{new Date(r.created_at).toLocaleString('uk-UA')}</td>
               <td>{r.payment}</td>
               <td>{money(r.total)}</td>
-              <td style={{ color: '#16a34a' }}>{money(r.profit)}</td>
+              {owner && <td style={{ color: '#16a34a' }}>{money(r.profit)}</td>}
             </tr>
           ))}
         </tbody>
