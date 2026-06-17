@@ -41,75 +41,70 @@ export function parseInvoice(buffer: Buffer): Promise<{ items: ParsedItem[] }> {
         // групуємо у рядки за y
         const byY: Record<number, Word[]> = {};
         words.forEach(w => { (byY[w.y] = byY[w.y] || []).push(w); });
-        const lines = Object.keys(byY).map(Number).sort((a, b) => a - b)
-          .map(y => ({ y, cells: byY[y].sort((a, b) => a.x - b.x) }));
+
+        // Збираємо кожен рядок у суцільний текст.
+        // Склеювання за x-проміжком: < GLUE — впритул (одна "літера-група"),
+        // інакше пробіл. Для per-letter PDF літери зливаються в слова.
+        function lineText(toks: Word[]): string {
+          const sorted = toks.slice().sort((a, b) => a.x - b.x);
+          let out = '';
+          let prevX = -999;
+          const GLUE = 0.5;
+          for (const t of sorted) {
+            if (out === '') out = t.s;
+            else if (t.x - prevX < GLUE) out += t.s;
+            else out += ' ' + t.s;
+            prevX = t.x;
+          }
+          return out.replace(/\s+/g, ' ').trim();
+        }
+
+        const textLines = Object.keys(byY).map(Number).sort((a, b) => a - b)
+          .map(y => lineText(byY[y]));
 
         const items: ParsedItem[] = [];
-        let pendingCode = '';
 
-        for (let li = 0; li < lines.length; li++) {
-          const cells = lines[li].cells;
-          const joined = cells.map(c => c.s.trim()).join(' ');
+        // Регулярка товарного рядка (польські фактури):
+        //  ^№  [код?]  назва  кількість(szt/pcs)  ... ставка(VAT) ...
+        // Числа польські: "1 994,96" / "29,49" / "2698,5100".
+        const NUM = '\\d[\\d \\u00a0]*[.,]\\d+|\\d[\\d \\u00a0]*';
+        const reLine = new RegExp(
+          '^(\\d{1,2})[.)]?\\s+' +           // 1: номер позиції
+          '(.+?)\\s+' +                      // 2: код+назва (жадібно мінімально)
+          '(\\d+(?:[.,]\\d+)?)\\s*' +        // 3: кількість
+          '(?:szt|pcs|szt\\.|\\(szt\\)|j\\.m\\.)[^\\d]*' + // одиниця
+          '(.+)$'                            // 4: хвіст із цінами/ставкою
+        , 'i');
 
-          // рядок-товар: починається з порядкового номера 1..99 (можливо з крапкою "1.")
-          const first = cells[0]?.s.trim().replace(/\.$/, '');
-          if (!/^\d{1,2}$/.test(first || '')) {
-            // можливо це самотній EAN-код під попереднім товаром (запамʼ?ятаємо)
-            if (cells.length === 1 && /^\d{8,14}$/.test(first || '') && items.length) {
-              if (!items[items.length - 1].code) items[items.length - 1].code = first;
-            }
-            continue;
-          }
+        for (const line of textLines) {
+          const m = line.match(reLine);
+          if (!m) continue;
 
-          // знаходимо число кількості: "5,000" / "1 szt" / окремі "1" + "szt"
-          let qtyIdx = -1, qty = 0;
-          for (let i = 1; i < cells.length; i++) {
-            const s = cells[i].s.trim();
-            if (/\bszt|\bpcs|\bszt\./i.test(s)) {
-              // якщо у самому токені є число — беремо його, інакше дивимось попередній токен
-              const inSame = num(s);
-              if (inSame > 0) { qtyIdx = i; qty = inSame; }
-              else {
-                const prev = cells[i - 1]?.s.trim() || '';
-                if (/^\d+([.,]\d+)?$/.test(prev)) { qtyIdx = i - 1; qty = num(prev); }
-                else { qtyIdx = i; qty = 1; }
-              }
-              break;
-            }
-            if (/^\d+[.,]\d{3}$/.test(s)) { qtyIdx = i; qty = num(s); break; } // "5,000"
-          }
-          if (qtyIdx === -1) continue; // не товарний рядок
+          const qty = num(m[3]) || 1;
+          let nameRaw = m[2].trim();
+          const tail = m[4];
 
-          // межа назви: до позиції першого з [qty-токен, окремий "szt"]
-          let nameEnd = qtyIdx;
-
-          // код: другий токен, якщо схожий на артикул І після нього лишається назва
-          let code = '';
-          let nameStart = 1;
-          const second = cells[1]?.s.trim() || '';
-          const hasMoreCols = nameEnd > 2; // є щонайменше ще один токен між second і qty
-          if (hasMoreCols && /^[0-9A-Za-z][0-9A-Za-z\-_/]{2,}$/.test(second) && !/^\d+[.,]/.test(second)) {
-            code = second; nameStart = 2;
-          }
-          const name = cells.slice(nameStart, nameEnd).map(c => c.s.trim()).join(' ').trim();
-
-          // числа праворуч від кількості; пропускаємо одиниці (szt/pcs)
-          const after = cells.slice(qtyIdx + 1).map(c => c.s.trim())
-            .filter(s => s && !/^(szt\.?|pcs|\/|j\.m\.)$/i.test(s));
+          // у хвості шукаємо ставку ПДВ і ціну нетто за одиницю
+          const tailNums = tail.match(new RegExp(NUM, 'g')) || [];
           let vat = 23;
-          // ціна нетто за одиницю = перше число, що не ставка ПДВ і не нуль (rabat 0,00)
           let purchase = 0;
-          for (let i = 0; i < after.length; i++) {
-            const raw = after[i];
-            // ставка ПДВ: "23", "23%", "8%", "0", "5"
-            if (/^(0|5|8|23)\s*%?$/.test(raw.replace(/\s/g, ''))) { vat = parseInt(raw); continue; }
-            if (raw === '0,00' || raw === '0,0000') continue; // rabat
+          for (const raw of tailNums) {
+            const clean = raw.replace(/[ \u00a0]/g, '');
+            // ставка ПДВ
+            if (/^(0|5|8|23)$/.test(clean) && !/[.,]/.test(clean)) { vat = parseInt(clean); continue; }
+            if (clean === '0,00' || clean === '0.00') continue; // rabat
             const v = num(raw);
-            if (v > 0) { purchase = v; break; }
+            if (v > 0 && purchase === 0) { purchase = v; }
           }
 
-          if (!name || purchase <= 0) continue;
-          items.push({ code, name, qty: qty || 1, purchase, vat, isDelivery: DELIVERY.test(name) });
+          // відокремлюємо код від назви: артикул зазвичай містить цифри
+          // і/або дефіс (P02267, ELB-D-28-095, AKC133-1, 000846)
+          let code = '';
+          const cm = nameRaw.match(/^([A-Za-z0-9][A-Za-z0-9\-_/]*\d[A-Za-z0-9\-_/]*)\s+(.+)$/);
+          if (cm && cm[2].length > 2) { code = cm[1]; nameRaw = cm[2].trim(); }
+
+          if (!nameRaw || purchase <= 0) continue;
+          items.push({ code, name: nameRaw, qty, purchase, vat, isDelivery: DELIVERY.test(nameRaw) });
         }
 
         resolve({ items });
