@@ -51,8 +51,8 @@ export function parseInvoice(buffer: Buffer): Promise<{ items: ParsedItem[] }> {
           const cells = lines[li].cells;
           const joined = cells.map(c => c.s.trim()).join(' ');
 
-          // рядок-товар: починається з порядкового номера 1..99
-          const first = cells[0]?.s.trim();
+          // рядок-товар: починається з порядкового номера 1..99 (можливо з крапкою "1.")
+          const first = cells[0]?.s.trim().replace(/\.$/, '');
           if (!/^\d{1,2}$/.test(first || '')) {
             // можливо це самотній EAN-код під попереднім товаром (запамʼ?ятаємо)
             if (cells.length === 1 && /^\d{8,14}$/.test(first || '') && items.length) {
@@ -61,36 +61,50 @@ export function parseInvoice(buffer: Buffer): Promise<{ items: ParsedItem[] }> {
             continue;
           }
 
-          // знаходимо число кількості: токен виду "5,000" або "1 szt" або "1 szt. / pcs"
+          // знаходимо число кількості: "5,000" / "1 szt" / окремі "1" + "szt"
           let qtyIdx = -1, qty = 0;
           for (let i = 1; i < cells.length; i++) {
             const s = cells[i].s.trim();
-            if (/\bszt|\bpcs|\bszt\./i.test(s)) { qtyIdx = i; qty = num(s) || 1; break; }
+            if (/\bszt|\bpcs|\bszt\./i.test(s)) {
+              // якщо у самому токені є число — беремо його, інакше дивимось попередній токен
+              const inSame = num(s);
+              if (inSame > 0) { qtyIdx = i; qty = inSame; }
+              else {
+                const prev = cells[i - 1]?.s.trim() || '';
+                if (/^\d+([.,]\d+)?$/.test(prev)) { qtyIdx = i - 1; qty = num(prev); }
+                else { qtyIdx = i; qty = 1; }
+              }
+              break;
+            }
             if (/^\d+[.,]\d{3}$/.test(s)) { qtyIdx = i; qty = num(s); break; } // "5,000"
           }
           if (qtyIdx === -1) continue; // не товарний рядок
+
+          // межа назви: до позиції першого з [qty-токен, окремий "szt"]
+          let nameEnd = qtyIdx;
 
           // код: другий токен, якщо схожий на артикул І після нього лишається назва
           let code = '';
           let nameStart = 1;
           const second = cells[1]?.s.trim() || '';
-          const hasMoreCols = qtyIdx > 2; // є щонайменше ще один токен між second і qty
+          const hasMoreCols = nameEnd > 2; // є щонайменше ще один токен між second і qty
           if (hasMoreCols && /^[0-9A-Za-z][0-9A-Za-z\-_/]{2,}$/.test(second) && !/^\d+[.,]/.test(second)) {
             code = second; nameStart = 2;
           }
-          const name = cells.slice(nameStart, qtyIdx).map(c => c.s.trim()).join(' ').trim();
+          const name = cells.slice(nameStart, nameEnd).map(c => c.s.trim()).join(' ').trim();
 
-          // числа праворуч від кількості: [cena netto/od][?][vat][...]; беремо ціну нетто за од.
-          const after = cells.slice(qtyIdx + 1).map(c => c.s.trim()).filter(Boolean);
-          // шукаємо ставку VAT (ціле 0,5,8,23) щоб орієнтуватися
+          // числа праворуч від кількості; пропускаємо одиниці (szt/pcs)
+          const after = cells.slice(qtyIdx + 1).map(c => c.s.trim())
+            .filter(s => s && !/^(szt\.?|pcs|\/|j\.m\.)$/i.test(s));
           let vat = 23;
-          const nums = after.map(num);
-          // ціна нетто за одиницю = перше число після qty, що не є ставкою vat і не нуль (rabat 0,00)
+          // ціна нетто за одиницю = перше число, що не ставка ПДВ і не нуль (rabat 0,00)
           let purchase = 0;
           for (let i = 0; i < after.length; i++) {
-            const v = nums[i];
-            if (/^(0|5|8|23)$/.test(after[i].replace(/\s/g, ''))) { vat = Number(after[i]); continue; }
-            if (after[i] === '0,00') continue; // rabat
+            const raw = after[i];
+            // ставка ПДВ: "23", "23%", "8%", "0", "5"
+            if (/^(0|5|8|23)\s*%?$/.test(raw.replace(/\s/g, ''))) { vat = parseInt(raw); continue; }
+            if (raw === '0,00' || raw === '0,0000') continue; // rabat
+            const v = num(raw);
             if (v > 0) { purchase = v; break; }
           }
 
