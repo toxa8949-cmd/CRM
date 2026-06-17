@@ -12,6 +12,7 @@ const nav = [
   { href: '/sales', label: 'Продажі', icon: '🧾' },
   { href: '/pos', label: 'Каса', icon: '🛒' },
   { href: '/products', label: 'Склад', icon: '📦' },
+  { href: '/intake', label: 'Прихід', icon: '📥' },
   { href: '/customers', label: 'Клієнти', icon: '👥' },
   { href: '/expenses', label: 'Витрати', icon: '💸' },
   { href: '/reports', label: 'Звіти', icon: '📈' },
