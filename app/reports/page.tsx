@@ -14,25 +14,26 @@ export default function ReportsPage() {
     setLoading(true);
     const toEnd = to + 'T23:59:59';
     const [{ data: sales }, { data: items }, { data: expenses }] = await Promise.all([
-      supabase.from('sales').select('total,profit,created_at,status').gte('created_at', from).lte('created_at', toEnd),
-      supabase.from('sale_items').select('product_name,qty,price,purchase,sale_id,sales!inner(created_at,status)')
+      supabase.from('sales').select('total,net,turnover_tax,profit,created_at,status').gte('created_at', from).lte('created_at', toEnd),
+      supabase.from('sale_items').select('product_name,qty,price,purchase,extra_cost,tax_rate,sale_id,sales!inner(created_at,status)')
         .gte('sales.created_at', from).lte('sales.created_at', toEnd),
       supabase.from('expenses').select('category,amount,spent_at').gte('spent_at', from).lte('spent_at', to),
     ]);
 
     const valid = (sales || []).filter(s => s.status !== 'Повернення');
-    const revenue = valid.reduce((a, s) => a + Number(s.total), 0);
-    const grossProfit = valid.reduce((a, s) => a + Number(s.profit), 0);
+    const revenue = valid.reduce((a, s) => a + Number(s.total), 0);      // брутто
+    const revenueNet = valid.reduce((a, s) => a + Number(s.net), 0);     // нетто
+    const grossProfit = valid.reduce((a, s) => a + Number(s.profit), 0); // вже з вирах. податком з обороту
     const expenseTotal = (expenses || []).reduce((a, e) => a + Number(e.amount), 0);
-    const tax = Math.round(revenue * 0.03);
-    const net = grossProfit - expenseTotal - tax;
+    const tax = valid.reduce((a, s) => a + Number(s.turnover_tax), 0);   // реальний податок з обороту
+    const net = grossProfit - expenseTotal;                             // чистий результат
 
     // топ товарів
     const map: Record<string, { qty: number; sum: number; profit: number }> = {};
     (items || []).filter((i: any) => i.sales?.status !== 'Повернення').forEach((i: any) => {
       const m = map[i.product_name] || { qty: 0, sum: 0, profit: 0 };
       m.qty += i.qty; m.sum += i.qty * Number(i.price);
-      m.profit += i.qty * (Number(i.price) - Number(i.purchase));
+      m.profit += i.qty * (Number(i.price) - Number(i.purchase) - Number(i.extra_cost) - Number(i.price) * Number(i.tax_rate) / 100);
       map[i.product_name] = m;
     });
     const top = Object.entries(map).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.sum - a.sum).slice(0, 10);
@@ -48,7 +49,7 @@ export default function ReportsPage() {
     const daily = Object.entries(dMap).map(([d, v]) => ({ d, v })).sort((a, b) => a.d.localeCompare(b.d));
     const maxDaily = Math.max(1, ...daily.map(x => x.v));
 
-    setData({ revenue, grossProfit, expenseTotal, tax, net, count: valid.length, top, byCat, daily, maxDaily });
+    setData({ revenue, revenueNet, grossProfit, expenseTotal, tax, net, count: valid.length, top, byCat, daily, maxDaily });
     setLoading(false);
   }
 
@@ -77,11 +78,12 @@ export default function ReportsPage() {
       {loading || !data ? <div className="loading">Завантаження…</div> : (
         <>
           <div className="grid">
-            <div className="card"><h3>Дохід</h3><div className="value blue">{money(data.revenue)}</div><span className="muted">{data.count} чек(ів)</span></div>
-            <div className="card"><h3>Валова маржа</h3><div className="value green">{money(data.grossProfit)}</div></div>
+            <div className="card"><h3>Дохід брутто</h3><div className="value blue">{money(data.revenue)}</div><span className="muted">{data.count} чек(ів)</span></div>
+            <div className="card"><h3>Дохід нетто</h3><div className="value">{money(data.revenueNet)}</div></div>
+            <div className="card"><h3>Чистий прибуток</h3><div className="value green">{money(data.grossProfit)}</div><span className="muted">після податку з обороту</span></div>
             <div className="card"><h3>Витрати</h3><div className="value red">{money(data.expenseTotal)}</div></div>
-            <div className="card"><h3>Податок 3%</h3><div className="value">{money(data.tax)}</div></div>
-            <div className="card"><h3>Чистий результат</h3><div className={'value ' + (data.net >= 0 ? 'green' : 'red')}>{money(data.net)}</div></div>
+            <div className="card"><h3>Податок з обороту</h3><div className="value">{money(data.tax)}</div><span className="muted">3% товар / 8% послуга</span></div>
+            <div className="card"><h3>Результат (− витрати)</h3><div className={'value ' + (data.net >= 0 ? 'green' : 'red')}>{money(data.net)}</div></div>
           </div>
 
           <h3>Продажі по днях</h3>

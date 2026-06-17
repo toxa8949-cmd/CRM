@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { supabase, money, type Product, type Customer } from '../../lib/supabase';
+import { supabase, money, brutto, taxRate, type Product, type Customer } from '../../lib/supabase';
 
 type CartItem = { product: Product; qty: number };
 
@@ -46,8 +46,12 @@ export default function PosPage() {
     setCart(cart.map(c => c.product.id === id ? { ...c, qty } : c));
   }
 
-  const total = cart.reduce((a, c) => a + Number(c.product.price) * c.qty, 0);
-  const profit = cart.reduce((a, c) => a + (Number(c.product.price) - Number(c.product.purchase)) * c.qty, 0);
+  const net = cart.reduce((a, c) => a + Number(c.product.price) * c.qty, 0);
+  const total = cart.reduce((a, c) => a + brutto(Number(c.product.price)) * c.qty, 0); // брутто для покупця
+  const turnoverTax = cart.reduce((a, c) => a + Number(c.product.price) * c.qty * taxRate(c.product.kind) / 100, 0);
+  const profit = cart.reduce((a, c) =>
+    a + (Number(c.product.price) - Number(c.product.purchase) - Number(c.product.extra_cost)
+         - Number(c.product.price) * taxRate(c.product.kind) / 100) * c.qty, 0);
 
   async function checkout() {
     if (cart.length === 0) return;
@@ -84,9 +88,9 @@ export default function PosPage() {
               <div key={p.id} className="pitem" onClick={() => addToCart(p)}>
                 <div>
                   <div style={{ fontWeight: 600 }}>{p.name}</div>
-                  <div className="muted" style={{ fontSize: 13 }}>{p.categories?.name || '—'} · залишок {p.stock}</div>
+                  <div className="muted" style={{ fontSize: 13 }}>{p.categories?.name || '—'} · залишок {p.stock} · {p.kind === 'Послуга' ? '8%' : '3%'}</div>
                 </div>
-                <div style={{ fontWeight: 700 }}>{money(p.price)}</div>
+                <div style={{ fontWeight: 700 }}>{money(brutto(p.price))}</div>
               </div>
             ))}
             {filtered.length === 0 && <div className="loading">Нічого не знайдено</div>}
@@ -100,17 +104,22 @@ export default function PosPage() {
             <div key={c.product.id} className="ci">
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600 }}>{c.product.name}</div>
-                <div className="muted" style={{ fontSize: 13 }}>{money(c.product.price)} × {c.qty}</div>
+                <div className="muted" style={{ fontSize: 13 }}>{money(brutto(c.product.price))} × {c.qty}</div>
               </div>
               <button className="qbtn" onClick={() => setQty(c.product.id, c.qty - 1)}>−</button>
               <span style={{ minWidth: 22, textAlign: 'center' }}>{c.qty}</span>
               <button className="qbtn" onClick={() => setQty(c.product.id, c.qty + 1)}>+</button>
-              <div style={{ minWidth: 80, textAlign: 'right', fontWeight: 700 }}>{money(c.product.price * c.qty)}</div>
+              <div style={{ minWidth: 80, textAlign: 'right', fontWeight: 700 }}>{money(brutto(c.product.price) * c.qty)}</div>
             </div>
           ))}
 
-          <div className="total">Разом: {money(total)}</div>
-          <div className="muted" style={{ marginTop: -10, marginBottom: 12 }}>Прибуток: {money(profit)}</div>
+          <div className="total">До сплати: {money(total)}</div>
+          <div className="muted" style={{ marginTop: -10, marginBottom: 6, fontSize: 13, lineHeight: 1.7 }}>
+            Нетто: {money(net)}<br />
+            ПДВ 23%: {money(total - net)}<br />
+            Податок з обороту: {money(turnoverTax)}<br />
+            <span style={{ color: '#16a34a', fontWeight: 600 }}>Чистий прибуток: {money(profit)}</span>
+          </div>
 
           <select value={customer} onChange={e => setCustomer(e.target.value)} style={{ marginBottom: 10 }}>
             <option value="">Без клієнта</option>

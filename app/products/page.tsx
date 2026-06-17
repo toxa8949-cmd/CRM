@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { supabase, money, type Product, type Category } from '../../lib/supabase';
+import { supabase, money, brutto, taxRate, type Product, type Category } from '../../lib/supabase';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -8,7 +8,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [search, setSearch] = useState('');
-  const [form, setForm] = useState({ name: '', category_id: '', sku: '', stock: '', purchase: '', price: '', low_stock: '2' });
+  const [form, setForm] = useState({ name: '', category_id: '', sku: '', stock: '', purchase: '', price: '', low_stock: '2', kind: 'Товар', extra_cost: '' });
   const [edit, setEdit] = useState<Product | null>(null);
 
   useEffect(() => { load(); }, []);
@@ -33,9 +33,11 @@ export default function ProductsPage() {
       purchase: Number(form.purchase) || 0,
       price: Number(form.price) || 0,
       low_stock: Number(form.low_stock) || 2,
+      kind: form.kind,
+      extra_cost: Number(form.extra_cost) || 0,
     });
     if (error) return setErr(error.message);
-    setForm({ name: '', category_id: '', sku: '', stock: '', purchase: '', price: '', low_stock: '2' });
+    setForm({ name: '', category_id: '', sku: '', stock: '', purchase: '', price: '', low_stock: '2', kind: 'Товар', extra_cost: '' });
     load();
   }
 
@@ -44,6 +46,7 @@ export default function ProductsPage() {
     const { error } = await supabase.from('products').update({
       name: edit.name, category_id: edit.category_id, sku: edit.sku,
       stock: edit.stock, purchase: edit.purchase, price: edit.price, low_stock: edit.low_stock,
+      kind: edit.kind, extra_cost: edit.extra_cost,
     }).eq('id', edit.id);
     if (error) return setErr(error.message);
     setEdit(null); load();
@@ -89,8 +92,13 @@ export default function ProductsPage() {
           {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
         <input className="input" placeholder="Артикул (SKU)" value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })} />
-        <input className="input" type="number" placeholder="Закупка" value={form.purchase} onChange={e => setForm({ ...form, purchase: e.target.value })} />
-        <input className="input" type="number" placeholder="Ціна продажу" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
+        <input className="input" type="number" placeholder="Закупка нетто" value={form.purchase} onChange={e => setForm({ ...form, purchase: e.target.value })} />
+        <input className="input" type="number" placeholder="Ціна продажу нетто" value={form.price} onChange={e => setForm({ ...form, price: e.target.value })} />
+        <input className="input" type="number" placeholder="Розтрати на од." value={form.extra_cost} onChange={e => setForm({ ...form, extra_cost: e.target.value })} />
+        <select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value })}>
+          <option value="Товар">Товар (3%)</option>
+          <option value="Послуга">Послуга (8%)</option>
+        </select>
         <input className="input" type="number" placeholder="Кількість" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} />
         <button onClick={add}>Додати товар</button>
       </div>
@@ -101,21 +109,22 @@ export default function ProductsPage() {
       </div>
 
       <table>
-        <thead><tr><th>Назва</th><th>Категорія</th><th>SKU</th><th>Залишок</th><th>Закупка</th><th>Продаж</th><th>Маржа</th><th></th></tr></thead>
+        <thead><tr><th>Назва</th><th>Тип</th><th>Залишок</th><th>Закупка нетто</th><th>Продаж нетто</th><th>Брутто</th><th>Розтрати</th><th>Чистий/од.</th><th></th></tr></thead>
         <tbody>
           {filtered.map(p => (edit && edit.id === p.id) ? (
             <tr key={p.id}>
               <td><input className="input" value={edit!.name} onChange={e => setEdit({ ...edit!, name: e.target.value })} /></td>
               <td>
-                <select value={edit!.category_id ?? ''} onChange={e => setEdit({ ...edit!, category_id: e.target.value ? Number(e.target.value) : null })}>
-                  <option value="">—</option>
-                  {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <select value={edit!.kind} onChange={e => setEdit({ ...edit!, kind: e.target.value })}>
+                  <option value="Товар">Товар (3%)</option>
+                  <option value="Послуга">Послуга (8%)</option>
                 </select>
               </td>
-              <td><input className="input" value={edit!.sku ?? ''} onChange={e => setEdit({ ...edit!, sku: e.target.value })} /></td>
               <td><input className="input" type="number" style={{ width: 70 }} value={edit!.stock} onChange={e => setEdit({ ...edit!, stock: Number(e.target.value) })} /></td>
-              <td><input className="input" type="number" style={{ width: 80 }} value={edit!.purchase} onChange={e => setEdit({ ...edit!, purchase: Number(e.target.value) })} /></td>
-              <td><input className="input" type="number" style={{ width: 80 }} value={edit!.price} onChange={e => setEdit({ ...edit!, price: Number(e.target.value) })} /></td>
+              <td><input className="input" type="number" style={{ width: 90 }} value={edit!.purchase} onChange={e => setEdit({ ...edit!, purchase: Number(e.target.value) })} /></td>
+              <td><input className="input" type="number" style={{ width: 90 }} value={edit!.price} onChange={e => setEdit({ ...edit!, price: Number(e.target.value) })} /></td>
+              <td>{money(brutto(edit!.price))}</td>
+              <td><input className="input" type="number" style={{ width: 80 }} value={edit!.extra_cost} onChange={e => setEdit({ ...edit!, extra_cost: Number(e.target.value) })} /></td>
               <td>—</td>
               <td style={{ display: 'flex', gap: 6 }}>
                 <button className="green" onClick={saveEdit}>✓</button>
@@ -124,13 +133,16 @@ export default function ProductsPage() {
             </tr>
           ) : (
             <tr key={p.id}>
-              <td>{p.name}</td>
-              <td>{p.categories?.name || <span className="muted">—</span>}</td>
-              <td>{p.sku || '—'}</td>
+              <td>{p.name}{p.sku && <div className="muted" style={{ fontSize: 12 }}>{p.sku}</div>}</td>
+              <td><span className="tag">{p.kind === 'Послуга' ? 'Послуга 8%' : 'Товар 3%'}</span></td>
               <td>{stockBadge(p)}</td>
               <td>{money(p.purchase)}</td>
               <td>{money(p.price)}</td>
-              <td style={{ color: '#16a34a' }}>{money(p.price - p.purchase)}</td>
+              <td className="muted">{money(brutto(p.price))}</td>
+              <td>{p.extra_cost ? money(p.extra_cost) : '—'}</td>
+              <td style={{ color: '#16a34a', fontWeight: 600 }}>
+                {money(p.price - p.purchase - p.extra_cost - p.price * taxRate(p.kind) / 100)}
+              </td>
               <td style={{ display: 'flex', gap: 6 }}>
                 <button className="ghost" onClick={() => receive(p)} title="Надходження">+склад</button>
                 <button className="ghost" onClick={() => setEdit(p)}>✎</button>
