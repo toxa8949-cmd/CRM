@@ -59,6 +59,13 @@ export default function SalesPage() {
     load();
   }
 
+  async function del(s: Sale) {
+    if (!confirm(`Видалити чек #${s.id} назавжди?\nТовар повернеться на склад, бонуси знімуться.\nЦю дію не можна скасувати.`)) return;
+    const { error } = await supabase.rpc('delete_sale', { p_sale_id: s.id });
+    if (error) { alert(error.message); return; }
+    load();
+  }
+
   async function pay(s: Sale) {
     const debt = s.total - s.paid;
     const amt = Number(prompt(`Довнести по чеку #${s.id}. Борг ${debt.toFixed(2)} zł. Сума:`, debt.toFixed(2)));
@@ -208,6 +215,7 @@ export default function SalesPage() {
                   {owner && s.status !== 'Повернення' && s.pay_status !== 'Оплачено' &&
                     <button className="green" onClick={() => pay(s)}>Довнести</button>}
                   {owner && s.status !== 'Повернення' && <button className="danger" onClick={() => refund(s)}>Повернення</button>}
+                  <button className="danger" onClick={() => del(s)}>🗑 Видалити</button>
                 </td>
               </tr>
 
