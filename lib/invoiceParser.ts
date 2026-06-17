@@ -22,6 +22,7 @@ export type ParsedItem = {
   purchase: number;   // нетто за одиницю
   vat: number;
   isDelivery: boolean;
+  pos?: number;        // номер позиції у фактурі (LP) — для звʼязку з Uwagi
 };
 
 const DELIVERY = /^(dostawa|wysy[łl]ka|delivery|przesy[łl]ka|transport)/i;
@@ -70,9 +71,10 @@ export function parseInvoice(buffer: Buffer): Promise<{ items: ParsedItem[] }> {
         const NUM = '\\d[\\d \\u00a0]*[.,]\\d+|\\d[\\d \\u00a0]*';
         const reLine = new RegExp(
           '^(\\d{1,2})[.)]?\\s+' +           // 1: номер позиції
-          '(.+?)\\s+' +                      // 2: код+назва (жадібно мінімально)
+          '(.+?)\\s+' +                      // 2: код+назва (мінімально жадібно)
           '(\\d+(?:[.,]\\d+)?)\\s*' +        // 3: кількість
-          '(?:szt|pcs|szt\\.|\\(szt\\)|j\\.m\\.)[^\\d]*' + // одиниця
+          '\\(?\\s*(?:szt|pcs|kpl|j\\.m)\\.?\\s*\\)?' + // одиниця: szt / szt. / (szt.) / pcs ...
+          '[^\\d-]*' +                       // роздільники до чисел
           '(.+)$'                            // 4: хвіст із цінами/ставкою
         , 'i');
 
@@ -104,7 +106,20 @@ export function parseInvoice(buffer: Buffer): Promise<{ items: ParsedItem[] }> {
           if (cm && cm[2].length > 2) { code = cm[1]; nameRaw = cm[2].trim(); }
 
           if (!nameRaw || purchase <= 0) continue;
-          items.push({ code, name: nameRaw, qty, purchase, vat, isDelivery: DELIVERY.test(nameRaw) });
+          items.push({ code, name: nameRaw, qty, purchase, vat, isDelivery: DELIVERY.test(nameRaw), pos: parseInt(m[1]) });
+        }
+
+        // Коди з розділу "Uwagi": рядки виду
+        //   "Nr pozycji: 1 - Opis: OPS-FR-26-799 4823089760865"
+        // → беремо перший токен після "Opis:" як артикул, привʼязуємо за номером позиції.
+        for (const line of textLines) {
+          const um = line.match(/Nr\s*pozycji:\s*(\d+)\s*-\s*Opis:\s*([A-Za-z0-9][A-Za-z0-9\-_/]+)/i);
+          if (um) {
+            const posNo = parseInt(um[1]);
+            const codeFromNote = um[2];
+            const it = items.find(x => x.pos === posNo && !x.code);
+            if (it) it.code = codeFromNote;
+          }
         }
 
         resolve({ items });
