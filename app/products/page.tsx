@@ -95,7 +95,7 @@ export default function ProductsPage() {
 
   // підсумки
   const totalPurchase = products.reduce((a, p) => a + p.stock * Number(p.purchase), 0);
-  const totalRetail = products.reduce((a, p) => a + p.stock * Number(p.price), 0);
+  const totalRetail = products.reduce((a, p) => a + p.stock * brutto(Number(p.price)), 0);
   const lowCount = products.filter(p => p.stock > 0 && p.stock <= p.low_stock).length;
   const outCount = products.filter(p => p.stock <= 0).length;
 
@@ -117,7 +117,7 @@ export default function ProductsPage() {
       <div className="grid">
         <div className="card"><h3>Позицій</h3><div className="value">{products.length}</div></div>
         {owner && <div className="card"><h3>Вартість (закупка)</h3><div className="value">{money(totalPurchase)}</div></div>}
-        <div className="card"><h3>Вартість (роздріб)</h3><div className="value blue">{money(totalRetail)}</div></div>
+        <div className="card"><h3>Вартість (роздріб, брутто)</h3><div className="value blue">{money(totalRetail)}</div></div>
         <div className="card"><h3>Закінчується / немає</h3>
           <div className="value"><span style={{ color: lowCount ? '#d97706' : '#9ca3af' }}>{lowCount}</span> <span className="muted">/</span> <span style={{ color: outCount ? '#dc2626' : '#9ca3af' }}>{outCount}</span></div>
         </div>

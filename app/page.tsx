@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { supabase, money, todayISO } from '../lib/supabase';
+import { supabase, money, todayISO, brutto, taxRate } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 
 export default function Dashboard() {
@@ -25,7 +25,7 @@ export default function Dashboard() {
         ? supabase.from('sales').select('total,net,turnover_tax,profit,paid,pay_status,status,created_at,id,payment').order('created_at', { ascending: false })
         : supabase.from('sales_safe').select('total,paid,pay_status,status,created_at,id,payment').order('created_at', { ascending: false }),
       owner
-        ? supabase.from('products').select('id,name,stock,purchase,price,low_stock')
+        ? supabase.from('products').select('id,name,stock,purchase,price,low_stock,extra_cost,kind')
         : supabase.from('products_safe').select('id,name,stock,price,low_stock'),
     ]);
 
@@ -54,7 +54,12 @@ export default function Dashboard() {
       monthTax: monthS.reduce((a, x) => a + Number(x.turnover_tax || 0), 0),
       monthCount: monthS.length,
       stockValue: p.reduce((a, x) => a + x.stock * Number(x.purchase), 0),
-      stockRetail: p.reduce((a, x) => a + x.stock * Number(x.price), 0),
+      stockRetail: p.reduce((a, x) => a + x.stock * brutto(Number(x.price)), 0),
+      stockProfit: p.reduce((a, x) => {
+        const priceNet = Number(x.price);
+        const unitProfit = priceNet - Number(x.purchase) - Number(x.extra_cost || 0) - priceNet * taxRate(x.kind) / 100;
+        return a + x.stock * unitProfit;
+      }, 0),
       lowStock: low.length,
       noPrice: p.filter(x => Number(x.price) <= 0).length,
       products: p.length,
@@ -154,8 +159,8 @@ export default function Dashboard() {
         <div className="card">
           <h3>Склад</h3>
           {owner && <div className="stock-row"><span>Закупівельна вартість</span><b>{money(stat.stockValue)}</b></div>}
-          <div className="stock-row"><span>Роздрібна вартість</span><b>{money(stat.stockRetail)}</b></div>
-          {owner && <div className="stock-row"><span>Потенційний прибуток</span><b style={{ color: '#16a34a' }}>{money(stat.stockRetail - stat.stockValue)}</b></div>}
+          <div className="stock-row"><span>Роздрібна вартість (брутто)</span><b>{money(stat.stockRetail)}</b></div>
+          {owner && <div className="stock-row"><span>Потенційний прибуток</span><b style={{ color: '#16a34a' }}>{money(stat.stockProfit)}</b></div>}
           <div className="stock-row"><span>Позицій у каталозі</span><b>{stat.products}</b></div>
         </div>
       </div>
