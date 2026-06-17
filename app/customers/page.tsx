@@ -81,10 +81,10 @@ export default function CustomersPage() {
               <td><input className="input" value={edit!.phone ?? ''} onChange={e => setEdit({ ...edit!, phone: e.target.value })} /></td>
               <td><input className="input" value={edit!.email ?? ''} onChange={e => setEdit({ ...edit!, email: e.target.value })} /></td>
               <td colSpan={2}><input className="input" value={edit!.note ?? ''} onChange={e => setEdit({ ...edit!, note: e.target.value })} placeholder="Примітка" /></td>
-              <td style={{ display: 'flex', gap: 6 }}>
+              <td className="actions"><div className="cell-actions">
                 <button className="green" onClick={saveEdit}>✓</button>
                 <button className="ghost" onClick={() => setEdit(null)}>✕</button>
-              </td>
+              </div></td>
             </tr>
           ) : (
             <tr key={c.id}>
@@ -93,10 +93,10 @@ export default function CustomersPage() {
               <td data-label="Email">{c.email || '—'}</td>
               <td data-label="Замовлень">{c.orders}</td>
               <td data-label="Витрачено">{money(c.spent)}</td>
-              <td className="actions" data-label="Дії" style={{ display: 'flex', gap: 6 }}>
+              <td className="actions" data-label="Дії"><div className="cell-actions">
                 <button className="ghost" onClick={() => setEdit(c)}>✎</button>
                 <button className="danger" onClick={() => del(c)}>🗑</button>
-              </td>
+              </div></td>
             </tr>
           ))}
         </tbody>

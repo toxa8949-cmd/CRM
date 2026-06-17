@@ -89,10 +89,10 @@ export default function ExpensesPage() {
               </td>
               <td><input className="input" type="number" style={{ width: 100 }} value={edit!.amount} onChange={ev => setEdit({ ...edit!, amount: Number(ev.target.value) })} /></td>
               <td><input className="input" value={edit!.description ?? ''} onChange={ev => setEdit({ ...edit!, description: ev.target.value })} /></td>
-              <td style={{ display: 'flex', gap: 6 }}>
+              <td className="actions"><div className="cell-actions">
                 <button className="green" onClick={saveEdit}>✓</button>
                 <button className="ghost" onClick={() => setEdit(null)}>✕</button>
-              </td>
+              </div></td>
             </tr>
           ) : (
             <tr key={e.id}>
@@ -100,10 +100,10 @@ export default function ExpensesPage() {
               <td data-label="Категорія"><span className="tag">{e.category}</span></td>
               <td data-label="Сума" style={{ color: '#dc2626' }}>{money(e.amount)}</td>
               <td data-label="Опис">{e.description || '—'}</td>
-              <td className="actions" data-label="Дії" style={{ display: 'flex', gap: 6 }}>
+              <td className="actions" data-label="Дії"><div className="cell-actions">
                 <button className="ghost" onClick={() => setEdit(e)}>✎</button>
                 <button className="danger" onClick={() => del(e)}>🗑</button>
-              </td>
+              </div></td>
             </tr>
           ))}
         </tbody>

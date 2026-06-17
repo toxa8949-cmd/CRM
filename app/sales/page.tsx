@@ -206,7 +206,8 @@ export default function SalesPage() {
                   {money(Math.max(0, s.total - s.paid))}
                 </td>
                 {owner && <td data-label="Прибуток" style={{ color: '#16a34a' }}>{money(s.profit)}</td>}
-                <td className="actions" data-label="Дії" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <td className="actions" data-label="Дії">
+                  <div className="cell-actions">
                   <button className="ghost" onClick={() => setOpen(open === s.id ? null : s.id)}>
                     {open === s.id ? 'Сховати' : 'Деталі'}
                   </button>
@@ -216,6 +217,7 @@ export default function SalesPage() {
                     <button className="green" onClick={() => pay(s)}>Довнести</button>}
                   {owner && s.status !== 'Повернення' && <button className="danger" onClick={() => refund(s)}>Повернення</button>}
                   <button className="danger" onClick={() => del(s)}>🗑 Видалити</button>
+                  </div>
                 </td>
               </tr>
 

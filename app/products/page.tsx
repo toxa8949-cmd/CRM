@@ -183,10 +183,10 @@ export default function ProductsPage() {
                 <div className="muted" style={{ fontSize: 11 }}>{editBrutto ? money(net(Number(editBrutto))) + ' нетто' : ''}</div>
               </td>
               <td>—</td>
-              <td style={{ display: 'flex', gap: 6 }}>
+              <td className="actions"><div className="cell-actions">
                 <button className="green" onClick={saveEdit}>✓</button>
                 <button className="ghost" onClick={() => setEdit(null)}>✕</button>
-              </td>
+              </div></td>
             </tr>
           ) : (
             <tr key={p.id}>
@@ -206,10 +206,12 @@ export default function ProductsPage() {
               {owner && <td data-label="Чистий/од." style={{ color: '#16a34a', fontWeight: 600 }}>
                 {money(p.price - p.purchase - (p.extra_cost || 0) - p.price * taxRate(p.kind) / 100)}
               </td>}
-              {owner && <td className="actions" data-label="Дії" style={{ display: 'flex', gap: 6 }}>
+              {owner && <td className="actions" data-label="Дії">
+                <div className="cell-actions">
                 <button className="ghost" onClick={() => receive(p)} title="Надходження">+склад</button>
                 <button className="ghost" onClick={() => startEdit(p)}>✎</button>
                 <button className="danger" onClick={() => del(p)}>🗑</button>
+                </div>
               </td>}
             </tr>
           ))}
