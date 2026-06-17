@@ -67,9 +67,12 @@ export default function SalesPage() {
               {open === s.id && (
                 <tr>
                   <td colSpan={8} style={{ background: '#f9fafb' }}>
-                    {(s.sale_items || []).map(it => (
+                    {(s.sale_items || []).map((it: any) => (
                       <div key={it.id} style={{ padding: '4px 0' }}>
-                        {it.product_name} — {it.qty} × {money(it.price)} = <b>{money(it.qty * it.price)}</b>
+                        {it.item_kind === 'Сервіс' ? '🔧 ' : ''}{it.product_name}
+                        {it.item_kind === 'Сервіс'
+                          ? <> (сервіс) — <b>{money(it.price * 1.23)}</b> <span className="muted">брутто</span></>
+                          : <> — {it.qty} × {money(it.price)} нетто = <b>{money(it.qty * it.price)}</b></>}
                       </div>
                     ))}
                     {s.note && <div className="muted">Примітка: {s.note}</div>}

@@ -3,11 +3,15 @@ import { useEffect, useState } from 'react';
 import { supabase, money, brutto, taxRate, type Product, type Customer } from '../../lib/supabase';
 
 type CartItem = { product: Product; qty: number };
+type ServiceItem = { description: string; brutto: number };
 
 export default function PosPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [services, setServices] = useState<ServiceItem[]>([]);
+  const [svcDesc, setSvcDesc] = useState('');
+  const [svcPrice, setSvcPrice] = useState('');
   const [search, setSearch] = useState('');
   const [customer, setCustomer] = useState('');
   const [payment, setPayment] = useState('Готівка');
@@ -46,18 +50,43 @@ export default function PosPage() {
     setCart(cart.map(c => c.product.id === id ? { ...c, qty } : c));
   }
 
-  const net = cart.reduce((a, c) => a + Number(c.product.price) * c.qty, 0);
-  const total = cart.reduce((a, c) => a + brutto(Number(c.product.price)) * c.qty, 0); // брутто для покупця
-  const turnoverTax = cart.reduce((a, c) => a + Number(c.product.price) * c.qty * taxRate(c.product.kind) / 100, 0);
-  const profit = cart.reduce((a, c) =>
+  function addService() {
+    setErr(''); setOk('');
+    const price = Number(svcPrice);
+    if (!price || price <= 0) return setErr('Вкажіть вартість сервісу');
+    setServices([...services, { description: svcDesc.trim() || 'Сервіс', brutto: price }]);
+    setSvcDesc(''); setSvcPrice('');
+  }
+
+  function removeService(i: number) {
+    setServices(services.filter((_, idx) => idx !== i));
+  }
+
+  // товари (ціни нетто)
+  const netGoods = cart.reduce((a, c) => a + Number(c.product.price) * c.qty, 0);
+  const bruttoGoods = cart.reduce((a, c) => a + brutto(Number(c.product.price)) * c.qty, 0);
+  const taxGoods = cart.reduce((a, c) => a + Number(c.product.price) * c.qty * taxRate(c.product.kind) / 100, 0);
+  const profitGoods = cart.reduce((a, c) =>
     a + (Number(c.product.price) - Number(c.product.purchase) - Number(c.product.extra_cost)
          - Number(c.product.price) * taxRate(c.product.kind) / 100) * c.qty, 0);
 
+  // сервіси (ціни брутто)
+  const bruttoSvc = services.reduce((a, s) => a + s.brutto, 0);
+  const netSvc = services.reduce((a, s) => a + s.brutto / 1.23, 0);
+  const taxSvc = netSvc * 0.08;
+  const profitSvc = netSvc - taxSvc; // собівартість 0
+
+  const net = netGoods + netSvc;
+  const total = bruttoGoods + bruttoSvc;
+  const turnoverTax = taxGoods + taxSvc;
+  const profit = profitGoods + profitSvc;
+
   async function checkout() {
-    if (cart.length === 0) return;
+    if (cart.length === 0 && services.length === 0) return;
     setBusy(true); setErr(''); setOk('');
     const { error } = await supabase.rpc('create_sale', {
       p_items: cart.map(c => ({ product_id: c.product.id, qty: c.qty })),
+      p_services: services.map(s => ({ description: s.description, brutto: s.brutto })),
       p_customer_id: customer ? Number(customer) : null,
       p_payment: payment,
       p_note: note || null,
@@ -65,7 +94,7 @@ export default function PosPage() {
     setBusy(false);
     if (error) return setErr(error.message);
     setOk(`Продаж оформлено на ${money(total)}`);
-    setCart([]); setNote(''); setCustomer('');
+    setCart([]); setServices([]); setNote(''); setCustomer('');
     load();
   }
 
@@ -95,11 +124,21 @@ export default function PosPage() {
             ))}
             {filtered.length === 0 && <div className="loading">Нічого не знайдено</div>}
           </div>
+
+          <div className="cart" style={{ marginTop: 16 }}>
+            <h3 style={{ marginTop: 0 }}>Додати сервіс</h3>
+            <input className="input" placeholder="Що зроблено (від руки)" value={svcDesc} onChange={e => setSvcDesc(e.target.value)} style={{ marginBottom: 10 }} />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <input className="input" type="number" placeholder="Вартість брутто" value={svcPrice} onChange={e => setSvcPrice(e.target.value)} onKeyDown={e => e.key === 'Enter' && addService()} />
+              <button className="ghost" onClick={addService}>Додати</button>
+            </div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>Ціна з ПДВ. Податок з обороту 8%, собівартість 0.</div>
+          </div>
         </div>
 
         <div className="cart">
           <h3 style={{ marginTop: 0 }}>Чек</h3>
-          {cart.length === 0 && <p className="muted">Додайте товари зліва</p>}
+          {cart.length === 0 && services.length === 0 && <p className="muted">Додайте товари або сервіс зліва</p>}
           {cart.map(c => (
             <div key={c.product.id} className="ci">
               <div style={{ flex: 1 }}>
@@ -110,6 +149,16 @@ export default function PosPage() {
               <span style={{ minWidth: 22, textAlign: 'center' }}>{c.qty}</span>
               <button className="qbtn" onClick={() => setQty(c.product.id, c.qty + 1)}>+</button>
               <div style={{ minWidth: 80, textAlign: 'right', fontWeight: 700 }}>{money(brutto(c.product.price) * c.qty)}</div>
+            </div>
+          ))}
+          {services.map((s, i) => (
+            <div key={'svc' + i} className="ci">
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600 }}>🔧 {s.description}</div>
+                <div className="muted" style={{ fontSize: 13 }}>Сервіс · 8%</div>
+              </div>
+              <button className="qbtn danger" onClick={() => removeService(i)} title="Прибрати">×</button>
+              <div style={{ minWidth: 80, textAlign: 'right', fontWeight: 700 }}>{money(s.brutto)}</div>
             </div>
           ))}
 
@@ -130,7 +179,7 @@ export default function PosPage() {
           </select>
           <input className="input" placeholder="Примітка" value={note} onChange={e => setNote(e.target.value)} style={{ marginBottom: 12 }} />
 
-          <button className="green" style={{ width: '100%' }} disabled={cart.length === 0 || busy} onClick={checkout}>
+          <button className="green" style={{ width: '100%' }} disabled={(cart.length === 0 && services.length === 0) || busy} onClick={checkout}>
             {busy ? 'Оформлення…' : `Оформити продаж · ${money(total)}`}
           </button>
         </div>
