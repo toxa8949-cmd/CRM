@@ -22,11 +22,12 @@ export default function MotivationPage() {
   async function load() {
     setLoading(true);
     const from = month + '-01';
-    const to = month + '-31';
-    let q = supabase.from('bonuses').select('*')
-      .gte('created_at', from).lte('created_at', to + 'T23:59:59')
+    // перший день наступного місяця — надійна верхня межа для будь-якого місяця
+    const [y, m] = month.split('-').map(Number);
+    const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
+    const { data, error } = await supabase.from('bonuses').select('*')
+      .gte('created_at', from).lt('created_at', next)
       .order('created_at', { ascending: false });
-    const { data, error } = await q;
     if (error) setErr(error.message);
     setRows(data || []);
     setLoading(false);
