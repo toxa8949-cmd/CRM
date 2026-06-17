@@ -31,12 +31,17 @@ export default function SettingsPage() {
     await supabase.from('categories').delete().eq('id', c.id); load();
   }
 
+  async function toggleAccessory(c: any) {
+    await supabase.from('categories').update({ is_accessory: !c.is_accessory }).eq('id', c.id);
+    load();
+  }
+
   if (loading) return <div className="loading">Завантаження…</div>;
 
   return (
     <>
       <h2>Категорії</h2>
-      <p className="muted">Категорії товарів для складу</p>
+      <p className="muted">Категорії товарів. Позначка «аксесуар» вмикає бонус 5% продавцю за продаж.</p>
       {err && <div className="err">{err}</div>}
 
       <div className="form" style={{ gridTemplateColumns: '1fr auto' }}>
@@ -45,13 +50,18 @@ export default function SettingsPage() {
       </div>
 
       <table>
-        <thead><tr><th>Категорія</th><th>Товарів</th><th></th></tr></thead>
+        <thead><tr><th>Категорія</th><th>Товарів</th><th>Аксесуар (бонус 5%)</th><th></th></tr></thead>
         <tbody>
-          {cats.length === 0 && <tr><td colSpan={3} className="muted">Немає категорій</td></tr>}
+          {cats.length === 0 && <tr><td colSpan={4} className="muted">Немає категорій</td></tr>}
           {cats.map(c => (
             <tr key={c.id}>
               <td data-label="Категорія">{c.name}</td>
               <td data-label="Товарів">{c.count}</td>
+              <td data-label="Аксесуар">
+                <button className={c.is_accessory ? 'green' : 'ghost'} onClick={() => toggleAccessory(c)}>
+                  {c.is_accessory ? '✓ Так' : 'Ні'}
+                </button>
+              </td>
               <td className="actions" data-label="Дії"><button className="danger" onClick={() => del(c)}>🗑</button></td>
             </tr>
           ))}
