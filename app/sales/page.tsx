@@ -1,19 +1,83 @@
-import { sales, money } from '../data';
+'use client';
+import { useEffect, useState, Fragment } from 'react';
+import { supabase, money, type Sale } from '../../lib/supabase';
 
 export default function SalesPage() {
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState<number | null>(null);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    const { data } = await supabase
+      .from('sales')
+      .select('*,customers(name),sale_items(*)')
+      .order('created_at', { ascending: false })
+      .limit(300);
+    setSales(data || []); setLoading(false);
+  }
+
+  // Повернення: повертає товар на склад і помічає чек
+  async function refund(s: Sale) {
+    if (s.status === 'Повернення') return;
+    if (!confirm(`Оформити повернення чеку #${s.id}? Товар повернеться на склад.`)) return;
+    for (const it of s.sale_items || []) {
+      if (!it.product_id) continue;
+      const { data: p } = await supabase.from('products').select('stock').eq('id', it.product_id).single();
+      if (p) {
+        await supabase.from('products').update({ stock: p.stock + it.qty }).eq('id', it.product_id);
+        await supabase.from('stock_moves').insert({ product_id: it.product_id, delta: it.qty, reason: 'Повернення' });
+      }
+    }
+    await supabase.from('sales').update({ status: 'Повернення', total: 0, profit: 0 }).eq('id', s.id);
+    load();
+  }
+
+  if (loading) return <div className="loading">Завантаження…</div>;
+
   return (
     <>
       <h2>Продажі</h2>
-      <div className="form">
-        <input className="input" placeholder="Товар" />
-        <input className="input" placeholder="Кількість" />
-        <input className="input" placeholder="Ціна продажу" />
-        <button>Продати</button>
-      </div>
+      <p className="muted">Історія чеків. Нові продажі оформлюйте в розділі «Каса».</p>
       <table>
-        <thead><tr><th>Дата</th><th>Товар</th><th>К-сть</th><th>Сума</th><th>Прибуток</th></tr></thead>
+        <thead><tr><th>#</th><th>Дата</th><th>Клієнт</th><th>Оплата</th><th>Статус</th><th>Сума</th><th>Прибуток</th><th></th></tr></thead>
         <tbody>
-          {sales.map(s => <tr key={s.id}><td>{s.date}</td><td>{s.product}</td><td>{s.qty}</td><td>{money(s.amount)}</td><td>{money(s.profit)}</td></tr>)}
+          {sales.length === 0 && <tr><td colSpan={8} className="muted">Ще немає продажів</td></tr>}
+          {sales.map(s => (
+            <Fragment key={s.id}>
+              <tr>
+                <td>{s.id}</td>
+                <td>{new Date(s.created_at).toLocaleString('uk-UA')}</td>
+                <td>{s.customers?.name || '—'}</td>
+                <td>{s.payment}</td>
+                <td>{s.status === 'Повернення'
+                  ? <span className="badge out">Повернення</span>
+                  : <span className="badge ok">Завершено</span>}</td>
+                <td>{money(s.total)}</td>
+                <td style={{ color: '#16a34a' }}>{money(s.profit)}</td>
+                <td style={{ display: 'flex', gap: 6 }}>
+                  <button className="ghost" onClick={() => setOpen(open === s.id ? null : s.id)}>
+                    {open === s.id ? 'Сховати' : 'Деталі'}
+                  </button>
+                  {s.status !== 'Повернення' && <button className="danger" onClick={() => refund(s)}>Повернення</button>}
+                </td>
+              </tr>
+              {open === s.id && (
+                <tr>
+                  <td colSpan={8} style={{ background: '#f9fafb' }}>
+                    {(s.sale_items || []).map(it => (
+                      <div key={it.id} style={{ padding: '4px 0' }}>
+                        {it.product_name} — {it.qty} × {money(it.price)} = <b>{money(it.qty * it.price)}</b>
+                      </div>
+                    ))}
+                    {s.note && <div className="muted">Примітка: {s.note}</div>}
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          ))}
         </tbody>
       </table>
     </>
