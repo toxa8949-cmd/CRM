@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { supabase, money, todayISO, type Expense } from '../../lib/supabase';
+import { supabase, money, todayISO, exportCSV, type Expense } from '../../lib/supabase';
 
 const CATS = ['Реклама', 'Оренда', 'Зарплата', 'Бухгалтер', 'Закупівля', 'Доставка', 'Податки', 'Інше'];
 
@@ -9,6 +9,7 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [form, setForm] = useState({ category: 'Реклама', amount: '', description: '', spent_at: todayISO() });
+  const [edit, setEdit] = useState<Expense | null>(null);
 
   useEffect(() => { load(); }, []);
 
@@ -34,6 +35,22 @@ export default function ExpensesPage() {
     await supabase.from('expenses').delete().eq('id', e.id); load();
   }
 
+  async function saveEdit() {
+    if (!edit) return;
+    await supabase.from('expenses').update({
+      category: edit.category, amount: Number(edit.amount),
+      description: edit.description, spent_at: edit.spent_at,
+    }).eq('id', edit.id);
+    setEdit(null); load();
+  }
+
+  function exportExpenses() {
+    exportCSV(`vytraty_${todayISO()}.csv`, list.map(e => ({
+      'Дата': e.spent_at, 'Категорія': e.category,
+      'Сума': Number(e.amount).toFixed(2), 'Опис': e.description || '',
+    })));
+  }
+
   const total = list.reduce((a, e) => a + Number(e.amount), 0);
 
   if (loading) return <div className="loading">Завантаження…</div>;
@@ -54,17 +71,39 @@ export default function ExpensesPage() {
         <button onClick={add}>Додати витрату</button>
       </div>
 
+      <div className="row">
+        <button className="ghost" onClick={exportExpenses}>Експорт CSV</button>
+      </div>
+
       <table>
         <thead><tr><th>Дата</th><th>Категорія</th><th>Сума</th><th>Опис</th><th></th></tr></thead>
         <tbody>
           {list.length === 0 && <tr><td colSpan={5} className="muted">Немає витрат</td></tr>}
-          {list.map(e => (
+          {list.map(e => (edit && edit.id === e.id) ? (
+            <tr key={e.id}>
+              <td><input className="input" type="date" value={edit!.spent_at} onChange={ev => setEdit({ ...edit!, spent_at: ev.target.value })} /></td>
+              <td>
+                <select value={edit!.category} onChange={ev => setEdit({ ...edit!, category: ev.target.value })}>
+                  {CATS.map(c => <option key={c}>{c}</option>)}
+                </select>
+              </td>
+              <td><input className="input" type="number" style={{ width: 100 }} value={edit!.amount} onChange={ev => setEdit({ ...edit!, amount: Number(ev.target.value) })} /></td>
+              <td><input className="input" value={edit!.description ?? ''} onChange={ev => setEdit({ ...edit!, description: ev.target.value })} /></td>
+              <td style={{ display: 'flex', gap: 6 }}>
+                <button className="green" onClick={saveEdit}>✓</button>
+                <button className="ghost" onClick={() => setEdit(null)}>✕</button>
+              </td>
+            </tr>
+          ) : (
             <tr key={e.id}>
               <td>{e.spent_at}</td>
               <td><span className="tag">{e.category}</span></td>
               <td style={{ color: '#dc2626' }}>{money(e.amount)}</td>
               <td>{e.description || '—'}</td>
-              <td><button className="danger" onClick={() => del(e)}>🗑</button></td>
+              <td style={{ display: 'flex', gap: 6 }}>
+                <button className="ghost" onClick={() => setEdit(e)}>✎</button>
+                <button className="danger" onClick={() => del(e)}>🗑</button>
+              </td>
             </tr>
           ))}
         </tbody>

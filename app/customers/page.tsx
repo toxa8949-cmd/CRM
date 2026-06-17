@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { supabase, money, type Customer } from '../../lib/supabase';
+import { supabase, money, exportCSV, type Customer } from '../../lib/supabase';
 
 export default function CustomersPage() {
   const [list, setList] = useState<any[]>([]);
@@ -45,6 +45,13 @@ export default function CustomersPage() {
     await supabase.from('customers').delete().eq('id', c.id); load();
   }
 
+  function exportCustomers() {
+    exportCSV(`kliienty_${new Date().toISOString().slice(0, 10)}.csv`, list.map(c => ({
+      'Ім\u2019я': c.name, 'Телефон': c.phone || '', 'Email': c.email || '',
+      'Замовлень': c.orders, 'Витрачено': Number(c.spent).toFixed(2), 'Примітка': c.note || '',
+    })));
+  }
+
   if (loading) return <div className="loading">Завантаження…</div>;
 
   return (
@@ -59,6 +66,10 @@ export default function CustomersPage() {
         <input className="input" placeholder="Email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
         <input className="input" placeholder="Примітка" value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
         <button onClick={add}>Додати клієнта</button>
+      </div>
+
+      <div className="row">
+        <button className="ghost" onClick={exportCustomers}>Експорт CSV</button>
       </div>
 
       <table>
