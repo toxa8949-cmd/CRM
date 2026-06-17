@@ -48,4 +48,29 @@ a.link{color:#2563eb;cursor:pointer}
   body{display:block}.sidebar{position:static;width:auto;min-height:auto}
   .sidebar nav{flex-direction:row;flex-wrap:wrap}.sidebar a{flex:1 1 auto}
   .content{margin-left:0;width:100%;padding:16px}.pos{grid-template-columns:1fr}
+  .dash-hero{flex-direction:column}.dash-cols{grid-template-columns:1fr}
 }
+
+/* ---- Панель ---- */
+.dash-hero{display:flex;gap:20px;margin-bottom:20px}
+.hero-main{flex:1.3;background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;border-radius:18px;padding:26px 28px;box-shadow:0 10px 30px rgba(37,99,235,.25)}
+.hero-label{font-size:14px;opacity:.85;text-transform:uppercase;letter-spacing:.5px}
+.hero-value{font-size:42px;font-weight:800;margin:6px 0 8px;line-height:1}
+.hero-sub{font-size:15px;opacity:.92}
+.hero-side{flex:1;display:flex;flex-direction:column;gap:12px}
+.hero-mini{background:#fff;border-radius:14px;padding:14px 18px;box-shadow:0 6px 18px rgba(0,0,0,.05);display:flex;flex-direction:column;gap:2px}
+.hero-mini span{color:#6b7280;font-size:13px}
+.hero-mini b{font-size:21px}
+.card.alert{cursor:pointer;transition:transform .12s}
+.card.alert:hover{transform:translateY(-2px)}
+.red-card{border-left:4px solid #dc2626}
+.orange-card{border-left:4px solid #d97706}
+.dash-cols{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;margin-bottom:24px}
+.bars{display:flex;align-items:flex-end;gap:6px;height:160px;margin-top:14px;overflow-x:auto;padding-bottom:4px}
+.bar-wrap{flex:1;min-width:18px;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end;gap:6px}
+.bar{width:100%;max-width:34px;background:linear-gradient(180deg,#3b82f6,#2563eb);border-radius:6px 6px 0 0;min-height:4px;transition:opacity .15s}
+.bar-wrap:hover .bar{opacity:.75}
+.bar-day{font-size:11px;color:#9ca3af}
+.stock-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #f1f5f9;font-size:15px}
+.stock-row:last-child{border-bottom:0}
+.stock-row span{color:#6b7280}
