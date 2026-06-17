@@ -16,6 +16,9 @@ export default function PosPage() {
   const [customer, setCustomer] = useState('');
   const [payment, setPayment] = useState('Готівка');
   const [note, setNote] = useState('');
+  const [discount, setDiscount] = useState('');
+  const [paid, setPaid] = useState('');
+  const [partial, setPartial] = useState(false);
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
   const [busy, setBusy] = useState(false);
@@ -76,10 +79,22 @@ export default function PosPage() {
   const taxSvc = netSvc * 0.08;
   const profitSvc = netSvc - taxSvc; // собівартість 0
 
-  const net = netGoods + netSvc;
-  const total = bruttoGoods + bruttoSvc;
-  const turnoverTax = taxGoods + taxSvc;
-  const profit = profitGoods + profitSvc;
+  const netGross = netGoods + netSvc;
+  const grossTotal = bruttoGoods + bruttoSvc;       // брутто до знижки
+  const taxGross = taxGoods + taxSvc;
+  const profitGross = profitGoods + profitSvc;
+
+  // знижка (брутто), коефіцієнт зменшення
+  const disc = Math.min(Number(discount) || 0, grossTotal);
+  const factor = grossTotal > 0 ? (grossTotal - disc) / grossTotal : 1;
+
+  const total = grossTotal - disc;                  // до сплати
+  const net = netGross * factor;
+  const turnoverTax = taxGross * factor;
+  const profit = profitGross * factor;
+
+  const paidNum = partial ? (Number(paid) || 0) : total;
+  const debt = Math.max(0, total - paidNum);
 
   async function checkout() {
     if (cart.length === 0 && services.length === 0) return;
@@ -90,11 +105,14 @@ export default function PosPage() {
       p_customer_id: customer ? Number(customer) : null,
       p_payment: payment,
       p_note: note || null,
+      p_discount: disc,
+      p_paid: partial ? paidNum : null,
     });
     setBusy(false);
     if (error) return setErr(error.message);
-    setOk(`Продаж оформлено на ${money(total)}`);
+    setOk(`Продаж оформлено на ${money(total)}${debt > 0 ? ` · борг ${money(debt)}` : ''}`);
     setCart([]); setServices([]); setNote(''); setCustomer('');
+    setDiscount(''); setPaid(''); setPartial(false);
     load();
   }
 
@@ -162,13 +180,32 @@ export default function PosPage() {
             </div>
           ))}
 
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0' }}>
+            <span style={{ fontSize: 14 }}>Знижка, zł:</span>
+            <input className="input" type="number" placeholder="0" value={discount} onChange={e => setDiscount(e.target.value)} style={{ maxWidth: 110 }} />
+          </div>
+
           <div className="total">До сплати: {money(total)}</div>
           <div className="muted" style={{ marginTop: -10, marginBottom: 6, fontSize: 13, lineHeight: 1.7 }}>
+            {disc > 0 && <>Сума без знижки: {money(grossTotal)}<br />Знижка: −{money(disc)}<br /></>}
             Нетто: {money(net)}<br />
             ПДВ 23%: {money(total - net)}<br />
             Податок з обороту: {money(turnoverTax)}<br />
             <span style={{ color: '#16a34a', fontWeight: 600 }}>Чистий прибуток: {money(profit)}</span>
           </div>
+
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '4px 0 10px', fontSize: 14, cursor: 'pointer' }}>
+            <input type="checkbox" checked={partial} onChange={e => setPartial(e.target.checked)} />
+            Часткова оплата (резерв / пошта)
+          </label>
+          {partial && (
+            <div style={{ marginBottom: 10 }}>
+              <input className="input" type="number" placeholder="Сплачено зараз, zł" value={paid} onChange={e => setPaid(e.target.value)} style={{ marginBottom: 6 }} />
+              <div className="muted" style={{ fontSize: 13 }}>
+                Сплачено: {money(paidNum)} · <span style={{ color: debt > 0 ? '#dc2626' : '#16a34a', fontWeight: 600 }}>Борг: {money(debt)}</span>
+              </div>
+            </div>
+          )}
 
           <select value={customer} onChange={e => setCustomer(e.target.value)} style={{ marginBottom: 10 }}>
             <option value="">Без клієнта</option>

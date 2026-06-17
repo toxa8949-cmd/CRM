@@ -24,7 +24,7 @@ export type Product = {
 export type Customer = { id: number; name: string; phone: string | null; email: string | null; note: string | null };
 export type Sale = {
   id: number; customer_id: number | null; total: number; net: number;
-  turnover_tax: number; profit: number;
+  turnover_tax: number; profit: number; discount: number; paid: number; pay_status: string;
   payment: string; status: string; note: string | null; created_at: string;
   customers?: { name: string } | null;
   sale_items?: SaleItem[];
