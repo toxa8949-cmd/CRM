@@ -12,6 +12,7 @@ export const todayISO = () => new Date().toISOString().slice(0, 10);
 
 export const VAT = 0.23;                         // ПДВ 23%
 export const brutto = (net: number) => net * (1 + VAT); // нетто → брутто
+export const net = (gross: number) => gross / (1 + VAT); // брутто → нетто
 export const taxRate = (kind: string) => (kind === 'Послуга' ? 8 : 3); // податок з обороту, %
 
 // Експорт масиву обʼєктів у CSV-файл (з BOM для коректної кирилиці в Excel)
