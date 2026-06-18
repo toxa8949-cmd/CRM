@@ -13,6 +13,9 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [fCat, setFCat] = useState('');
   const [fStock, setFStock] = useState('');     // '', 'low', 'out', 'in'
+  const [sort, setSort] = useState('name');     // name | stock | price | profit
+  const [page, setPage] = useState(1);
+  const PER = 30;
   const [showForm, setShowForm] = useState(false);
   // ціна продажу в формі — брутто
   const [form, setForm] = useState({ name: '', category_id: '', sku: '', stock: '', purchase: '', priceBrutto: '', low_stock: '2', kind: 'Товар', extra_cost: '' });
@@ -20,6 +23,7 @@ export default function ProductsPage() {
   const [editBrutto, setEditBrutto] = useState(''); // ціна брутто в режимі редагування
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { setPage(1); }, [search, fCat, fStock, sort]);
 
   async function load() {
     setLoading(true);
@@ -84,25 +88,60 @@ export default function ProductsPage() {
     load();
   }
 
-  const filtered = products.filter(p => {
+  // множина id категорій для фільтра: обрана + її підкатегорії
+  const catIds = (() => {
+    if (!fCat) return null;
+    const ids = new Set<string>([fCat]);
+    (cats as any[]).forEach(c => { if (String(c.parent_id || '') === fCat) ids.add(String(c.id)); });
+    return ids;
+  })();
+
+  const filteredAll = products.filter(p => {
     if (search && !(p.name.toLowerCase().includes(search.toLowerCase()) || (p.sku || '').toLowerCase().includes(search.toLowerCase()))) return false;
-    if (fCat && String(p.category_id || '') !== fCat) return false;
+    if (catIds && !catIds.has(String(p.category_id || ''))) return false;
     if (fStock === 'low' && !(p.stock > 0 && p.stock <= p.low_stock)) return false;
     if (fStock === 'out' && p.stock > 0) return false;
     if (fStock === 'in' && p.stock <= 0) return false;
     return true;
   });
 
-  // підсумки
-  const totalPurchase = products.reduce((a, p) => a + p.stock * Number(p.purchase), 0);
-  const totalRetail = products.reduce((a, p) => a + p.stock * brutto(Number(p.price)), 0);
-  const lowCount = products.filter(p => p.stock > 0 && p.stock <= p.low_stock).length;
-  const outCount = products.filter(p => p.stock <= 0).length;
+  // сортування
+  const sorted = [...filteredAll].sort((a, b) => {
+    if (sort === 'stock') return a.stock - b.stock;
+    if (sort === 'price') return brutto(Number(b.price)) - brutto(Number(a.price));
+    if (sort === 'profit') {
+      const pf = (p: Product) => Number(p.price) - Number(p.purchase) - Number((p as any).extra_cost || 0) - Number(p.price) * taxRate(p.kind) / 100;
+      return pf(b) - pf(a);
+    }
+    return a.name.localeCompare(b.name);
+  });
+
+  // пагінація
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PER));
+  const curPage = Math.min(page, totalPages);
+  const filtered = sorted.slice((curPage - 1) * PER, curPage * PER);
+
+  // підсумки — по відфільтрованих (аналітика по обраній категорії)
+  const base = filteredAll;
+  const totalPurchase = base.reduce((a, p) => a + p.stock * Number(p.purchase), 0);
+  const totalRetail = base.reduce((a, p) => a + p.stock * brutto(Number(p.price)), 0);
+  const lowCount = base.filter(p => p.stock > 0 && p.stock <= p.low_stock).length;
+  const outCount = base.filter(p => p.stock <= 0).length;
 
   function stockBadge(p: Product) {
     if (p.stock <= 0) return <span className="badge out">Немає</span>;
     if (p.stock <= p.low_stock) return <span className="badge low">Мало ({p.stock})</span>;
     return <span className="badge ok">{p.stock} шт</span>;
+  }
+
+  // ієрархічні опції категорій (батько + підкатегорії з відступом)
+  function catOptions() {
+    return (cats as any[]).filter(c => !c.parent_id).map(p => [
+      <option key={p.id} value={p.id}>{p.name}</option>,
+      ...(cats as any[]).filter(c => c.parent_id === p.id).map(c =>
+        <option key={c.id} value={c.id}>{'\u00a0\u00a0↳ '}{c.name}</option>
+      )
+    ]);
   }
 
   if (loading) return <div className="loading">Завантаження…</div>;
@@ -113,9 +152,9 @@ export default function ProductsPage() {
       <p className="muted">Каталог товарів та залишки</p>
       {err && <div className="err">{err}</div>}
 
-      {/* Підсумки */}
+      {/* Підсумки (по обраному фільтру) */}
       <div className="grid">
-        <div className="card"><h3>Позицій</h3><div className="value">{products.length}</div></div>
+        <div className="card"><h3>Позицій{fCat ? ' (категорія)' : ''}</h3><div className="value">{base.length}</div></div>
         {owner && <div className="card"><h3>Вартість (закупка)</h3><div className="value">{money(totalPurchase)}</div></div>}
         <div className="card"><h3>Вартість (роздріб, брутто)</h3><div className="value blue">{money(totalRetail)}</div></div>
         <div className="card"><h3>Закінчується / немає</h3>
@@ -125,18 +164,29 @@ export default function ProductsPage() {
 
       {/* Панель фільтрів + кнопка додавання */}
       <div className="row">
-        <input className="input" style={{ maxWidth: 280 }} placeholder="Пошук за назвою / SKU" value={search} onChange={e => setSearch(e.target.value)} />
-        <select value={fCat} onChange={e => setFCat(e.target.value)} style={{ maxWidth: 180 }}>
+        <input className="input" style={{ maxWidth: 240 }} placeholder="Пошук за назвою / SKU" value={search} onChange={e => setSearch(e.target.value)} />
+        <select value={fCat} onChange={e => setFCat(e.target.value)} style={{ maxWidth: 200 }}>
           <option value="">Усі категорії</option>
-          {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {(cats as any[]).filter(c => !c.parent_id).map(p => [
+            <option key={p.id} value={p.id}>{p.name}</option>,
+            ...(cats as any[]).filter(c => c.parent_id === p.id).map(c =>
+              <option key={c.id} value={c.id}>{'\u00a0\u00a0↳ '}{c.name}</option>
+            )
+          ])}
         </select>
-        <select value={fStock} onChange={e => setFStock(e.target.value)} style={{ maxWidth: 160 }}>
+        <select value={fStock} onChange={e => setFStock(e.target.value)} style={{ maxWidth: 150 }}>
           <option value="">Будь-який залишок</option>
           <option value="in">В наявності</option>
           <option value="low">Закінчується</option>
           <option value="out">Немає</option>
         </select>
-        <span className="muted">{filtered.length} поз.</span>
+        <select value={sort} onChange={e => setSort(e.target.value)} style={{ maxWidth: 170 }}>
+          <option value="name">Сортувати: назва</option>
+          <option value="stock">Залишок (зрост.)</option>
+          <option value="price">Ціна (спад.)</option>
+          {owner && <option value="profit">Прибуток (спад.)</option>}
+        </select>
+        <span className="muted">{base.length} поз.</span>
         {owner && <button style={{ marginLeft: 'auto' }} onClick={() => setShowForm(!showForm)}>
           {showForm ? '✕ Сховати' : '+ Додати товар'}
         </button>}
@@ -148,7 +198,7 @@ export default function ProductsPage() {
           <input className="input" placeholder="Назва товару" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
           <select value={form.category_id} onChange={e => setForm({ ...form, category_id: e.target.value })}>
             <option value="">Без категорії</option>
-            {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {catOptions()}
           </select>
           <input className="input" placeholder="Артикул (SKU)" value={form.sku} onChange={e => setForm({ ...form, sku: e.target.value })} />
           <input className="input" type="number" placeholder="Закупка нетто" value={form.purchase} onChange={e => setForm({ ...form, purchase: e.target.value })} />
@@ -173,7 +223,7 @@ export default function ProductsPage() {
               <td>
                 <select value={edit!.category_id ?? ''} onChange={e => setEdit({ ...edit!, category_id: e.target.value ? Number(e.target.value) : null })}>
                   <option value="">—</option>
-                  {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  {catOptions()}
                 </select>
               </td>
               <td><input className="input" type="number" style={{ width: 70 }} value={edit!.stock} onChange={e => setEdit({ ...edit!, stock: Number(e.target.value) })} /></td>
@@ -217,6 +267,14 @@ export default function ProductsPage() {
           ))}
         </tbody>
       </table>
+
+      {totalPages > 1 && (
+        <div className="row" style={{ justifyContent: 'center', marginTop: 16 }}>
+          <button className="ghost" disabled={curPage <= 1} onClick={() => setPage(curPage - 1)}>← Назад</button>
+          <span className="muted">Сторінка {curPage} з {totalPages}</span>
+          <button className="ghost" disabled={curPage >= totalPages} onClick={() => setPage(curPage + 1)}>Далі →</button>
+        </div>
+      )}
     </>
   );
 }

@@ -92,9 +92,13 @@ export default function Dashboard() {
         <div className="hero-main">
           <div className="hero-label">Виручка сьогодні</div>
           <div className="hero-value">{money(stat.todayRevenue)}</div>
-          <div className="hero-sub">{stat.todayCount} продаж(ів){owner && <> · прибуток <b style={{ color: '#4ade80' }}>{money(stat.todayProfit)}</b></>}</div>
+          <div className="hero-sub">{stat.todayCount} продаж(ів) сьогодні</div>
         </div>
         <div className="hero-side">
+          {owner && <div className="hero-mini">
+            <span>Прибуток за день</span>
+            <b style={{ color: '#16a34a' }}>{money(stat.todayProfit)}</b>
+          </div>}
           <div className="hero-mini">
             <span>Дохід за місяць</span>
             <b>{money(stat.monthRevenue)}</b>
