@@ -16,6 +16,11 @@ export default function SalesPage() {
   const [fStatus, setFStatus] = useState('');   // фільтр статусу оплати
   const [fFrom, setFFrom] = useState('');
   const [fTo, setFTo] = useState('');
+  const [showManual, setShowManual] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+  const [man, setMan] = useState({ name: '', purchase: '', brutto: '', qty: '1', date: today, payment: 'Готівка' });
+  const [manErr, setManErr] = useState('');
+  const [manBusy, setManBusy] = useState(false);
 
   useEffect(() => { load(); }, []);
 
@@ -63,6 +68,28 @@ export default function SalesPage() {
     if (!confirm(`Видалити чек #${s.id} назавжди?\nТовар повернеться на склад, бонуси знімуться.\nЦю дію не можна скасувати.`)) return;
     const { error } = await supabase.rpc('delete_sale', { p_sale_id: s.id });
     if (error) { alert(error.message); return; }
+    load();
+  }
+
+  async function addManual() {
+    setManErr('');
+    if (!man.name.trim()) return setManErr('Вкажіть назву товару');
+    if (!man.brutto || Number(man.brutto) <= 0) return setManErr('Вкажіть ціну продажу');
+    const qty = Number(man.qty) || 1;
+    const pDate = man.date && man.date !== today ? `${man.date}T12:00:00` : null;
+    setManBusy(true);
+    const { error } = await supabase.rpc('manual_sale', {
+      p_name: man.name.trim(),
+      p_purchase: Number(man.purchase) || 0,
+      p_brutto: Number(man.brutto),
+      p_qty: qty,
+      p_date: pDate,
+      p_payment: man.payment,
+    });
+    setManBusy(false);
+    if (error) { setManErr(error.message); return; }
+    setMan({ name: '', purchase: '', brutto: '', qty: '1', date: today, payment: 'Готівка' });
+    setShowManual(false);
     load();
   }
 
@@ -185,7 +212,33 @@ export default function SalesPage() {
         <button className="ghost" onClick={() => { setSearch(''); setFStatus(''); setFFrom(''); setFTo(''); }}>Скинути</button>
         <button onClick={exportSales}>Експорт CSV</button>
         <span className="muted">{filtered.length} чек(ів)</span>
+        {owner && <button className="green" style={{ marginLeft: 'auto' }} onClick={() => setShowManual(!showManual)}>
+          {showManual ? '✕ Сховати' : '+ Додати продажу'}
+        </button>}
       </div>
+
+      {/* Форма ручної продажі (минулі продажі, без списання складу) */}
+      {owner && showManual && (
+        <div className="form" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(140px,1fr))' }}>
+          {manErr && <div className="err" style={{ gridColumn: '1/-1' }}>{manErr}</div>}
+          <input className="input" placeholder="Назва товару" value={man.name} onChange={e => setMan({ ...man, name: e.target.value })} style={{ gridColumn: '1/-1' }} />
+          <input className="input" type="number" placeholder="Закупка нетто" value={man.purchase} onChange={e => setMan({ ...man, purchase: e.target.value })} />
+          <input className="input" type="number" placeholder="Продаж брутто" value={man.brutto} onChange={e => setMan({ ...man, brutto: e.target.value })} />
+          <input className="input" type="number" placeholder="К-сть" value={man.qty} onChange={e => setMan({ ...man, qty: e.target.value })} />
+          <input className="input" type="date" max={today} value={man.date} onChange={e => setMan({ ...man, date: e.target.value })} />
+          <select value={man.payment} onChange={e => setMan({ ...man, payment: e.target.value })}>
+            <option>Готівка</option><option>Картка</option><option>Переказ</option><option>Накладений платіж</option>
+          </select>
+          <button className="green" disabled={manBusy} onClick={addManual}>{manBusy ? '…' : 'Зберегти'}</button>
+          {man.brutto && Number(man.brutto) > 0 && (
+            <div className="muted" style={{ gridColumn: '1/-1', fontSize: 13 }}>
+              Нетто: {money(Number(man.brutto) / 1.23 * (Number(man.qty) || 1))} ·
+              Прибуток: <b style={{ color: '#16a34a' }}>{money((Number(man.brutto) / 1.23 - (Number(man.purchase) || 0)) * (Number(man.qty) || 1) - (Number(man.brutto) / 1.23 * (Number(man.qty) || 1)) * 0.03)}</b>
+              <span style={{ marginLeft: 8 }}>· склад не змінюється</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <table>
         <thead><tr><th>#</th><th>Дата</th><th>Клієнт</th><th>Статус</th><th>Оплата</th><th>Сума</th><th>Борг</th>{owner && <th>Прибуток</th>}<th></th></tr></thead>
