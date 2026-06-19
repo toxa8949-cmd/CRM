@@ -26,7 +26,7 @@ function Inner({ children }: { children: ReactNode }) {
   const router = useRouter();
   const isLogin = pathname === '/login';
   const [menuOpen, setMenuOpen] = useState(false);
-  const [shop, setShop] = useState('rower');
+  const [shop, setShop] = useState<string | null>(null);
 
   const myShops = shopAccess === 'all' ? SHOPS : SHOPS.filter(s => s.slug === shopAccess);
 
@@ -40,10 +40,9 @@ function Inner({ children }: { children: ReactNode }) {
   }, [ready, role, shopAccess]);
 
   function switchShop(slug: string) {
-    setShop(slug);
     try { localStorage.setItem('activeShop', slug); } catch {}
     setMenuOpen(false);
-    // перезавантаження, щоб усі сторінки підхопили новий магазин
+    // повне перезавантаження, щоб усі сторінки гарантовано підхопили новий магазин
     window.location.href = '/';
   }
 
@@ -58,6 +57,9 @@ function Inner({ children }: { children: ReactNode }) {
   if (isLogin) return <main className="content" style={{ marginLeft: 0, width: '100%' }}>{children}</main>;
   if (!ready) return <main className="content" style={{ marginLeft: 0, width: '100%' }}><div className="loading">Завантаження…</div></main>;
   if (!role) return <main className="content" style={{ marginLeft: 0, width: '100%' }}><div className="loading">Перенаправлення…</div></main>;
+  // ключове: поки активний магазин не визначено з localStorage — не рендеримо сторінки
+  // (інакше вони встигають зробити запити зі стартовим магазином → плутанина даних)
+  if (!shop) return <main className="content" style={{ marginLeft: 0, width: '100%' }}><div className="loading">Завантаження…</div></main>;
 
   const items = NAV.filter(n => role === 'owner' || n.seller);
   const shopName = SHOPS.find(s => s.slug === shop)?.name || 'Rower Express';
@@ -69,6 +71,7 @@ function Inner({ children }: { children: ReactNode }) {
 
   return (
     <ShopProvider slug={shop}>
+      <div key={shop} style={{ display: 'contents' }}>
       <header className="topbar">
         <button className="burger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Меню">
           {menuOpen ? '✕' : '☰'}
@@ -100,6 +103,7 @@ function Inner({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <main className="content">{children}</main>
+      </div>
     </ShopProvider>
   );
 }
