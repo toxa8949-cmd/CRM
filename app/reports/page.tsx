@@ -1,23 +1,26 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase, money, todayISO } from '../../lib/supabase';
+import { useShop } from '../../lib/shop';
 
 export default function ReportsPage() {
+  const { slug: shop, currency, hasVat } = useShop();
+  const m = (v: number) => money(v, currency);
   const [from, setFrom] = useState(todayISO().slice(0, 8) + '01');
   const [to, setTo] = useState(todayISO());
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [shop]);
 
   async function load() {
     setLoading(true);
     const toEnd = to + 'T23:59:59';
     const [{ data: sales }, { data: items }, { data: expenses }] = await Promise.all([
-      supabase.from('sales').select('total,net,turnover_tax,profit,created_at,status').gte('created_at', from).lte('created_at', toEnd),
+      supabase.from('sales').select('total,net,turnover_tax,profit,created_at,status').eq('shop', shop).gte('created_at', from).lte('created_at', toEnd),
       supabase.from('sale_items').select('product_name,qty,price,purchase,extra_cost,tax_rate,sale_id,sales!inner(created_at,status)')
-        .gte('sales.created_at', from).lte('sales.created_at', toEnd),
-      supabase.from('expenses').select('category,amount,spent_at').gte('spent_at', from).lte('spent_at', to),
+        .eq('shop', shop).gte('sales.created_at', from).lte('sales.created_at', toEnd),
+      supabase.from('expenses').select('category,amount,spent_at').eq('shop', shop).gte('spent_at', from).lte('spent_at', to),
     ]);
 
     const valid = (sales || []).filter(s => s.status !== 'Повернення');
@@ -78,12 +81,12 @@ export default function ReportsPage() {
       {loading || !data ? <div className="loading">Завантаження…</div> : (
         <>
           <div className="grid">
-            <div className="card"><h3>Дохід брутто</h3><div className="value blue">{money(data.revenue)}</div><span className="muted">{data.count} чек(ів)</span></div>
-            <div className="card"><h3>Дохід нетто</h3><div className="value">{money(data.revenueNet)}</div></div>
-            <div className="card"><h3>Чистий прибуток</h3><div className="value green">{money(data.grossProfit)}</div><span className="muted">після податку з обороту</span></div>
-            <div className="card"><h3>Витрати</h3><div className="value red">{money(data.expenseTotal)}</div></div>
-            <div className="card"><h3>Податок з обороту</h3><div className="value">{money(data.tax)}</div><span className="muted">3% товар / 8% послуга</span></div>
-            <div className="card"><h3>Результат (− витрати)</h3><div className={'value ' + (data.net >= 0 ? 'green' : 'red')}>{money(data.net)}</div></div>
+            <div className="card"><h3>Дохід брутто</h3><div className="value blue">{m(data.revenue)}</div><span className="muted">{data.count} чек(ів)</span></div>
+            {hasVat && <div className="card"><h3>Дохід нетто</h3><div className="value">{m(data.revenueNet)}</div></div>}
+            <div className="card"><h3>Чистий прибуток</h3><div className="value green">{m(data.grossProfit)}</div><span className="muted">{hasVat ? 'після податку з обороту' : 'після комісій'}</span></div>
+            <div className="card"><h3>Витрати</h3><div className="value red">{m(data.expenseTotal)}</div></div>
+            {hasVat && <div className="card"><h3>Податок з обороту</h3><div className="value">{m(data.tax)}</div><span className="muted">3% товар / 8% послуга</span></div>}
+            <div className="card"><h3>Результат (− витрати)</h3><div className={'value ' + (data.net >= 0 ? 'green' : 'red')}>{m(data.net)}</div></div>
           </div>
 
           <h3>Продажі по днях</h3>
@@ -95,7 +98,7 @@ export default function ReportsPage() {
                 <div style={{ flex: 1, background: '#eef2ff', borderRadius: 6, height: 22 }}>
                   <div style={{ width: `${(d.v / data.maxDaily) * 100}%`, background: '#2563eb', height: 22, borderRadius: 6 }} />
                 </div>
-                <span style={{ width: 110, textAlign: 'right', fontWeight: 600 }}>{money(d.v)}</span>
+                <span style={{ width: 110, textAlign: 'right', fontWeight: 600 }}>{m(d.v)}</span>
               </div>
             ))}
           </div>
@@ -108,7 +111,7 @@ export default function ReportsPage() {
                 <tbody>
                   {data.top.length === 0 && <tr><td colSpan={4} className="muted">Немає даних</td></tr>}
                   {data.top.map((t: any) => (
-                    <tr key={t.name}><td data-label="Товар">{t.name}</td><td data-label="К-сть">{t.qty}</td><td data-label="Сума">{money(t.sum)}</td><td data-label="Прибуток" style={{ color: '#16a34a' }}>{money(t.profit)}</td></tr>
+                    <tr key={t.name}><td data-label="Товар">{t.name}</td><td data-label="К-сть">{t.qty}</td><td data-label="Сума">{m(t.sum)}</td><td data-label="Прибуток" style={{ color: '#16a34a' }}>{m(t.profit)}</td></tr>
                   ))}
                 </tbody>
               </table>
@@ -120,7 +123,7 @@ export default function ReportsPage() {
                 <tbody>
                   {data.byCat.length === 0 && <tr><td colSpan={2} className="muted">Немає даних</td></tr>}
                   {data.byCat.map((c: any) => (
-                    <tr key={c.category}><td data-label="Категорія"><span className="tag">{c.category}</span></td><td data-label="Сума" style={{ color: '#dc2626' }}>{money(c.amount)}</td></tr>
+                    <tr key={c.category}><td data-label="Категорія"><span className="tag">{c.category}</span></td><td data-label="Сума" style={{ color: '#dc2626' }}>{m(c.amount)}</td></tr>
                   ))}
                 </tbody>
               </table>
