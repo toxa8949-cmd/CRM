@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { supabase, money, brutto, net, type Category } from '../../lib/supabase';
+import { useShop } from '../../lib/shop';
 
 type Row = {
   code: string; name: string; qty: number;
@@ -12,6 +13,7 @@ type Row = {
 };
 
 export default function IntakePage() {
+  const { slug: shop } = useShop();
   const [rows, setRows] = useState<Row[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
   const [busy, setBusy] = useState(false);
@@ -20,7 +22,7 @@ export default function IntakePage() {
   const [fileName, setFileName] = useState('');
 
   useEffect(() => {
-    supabase.from('categories').select('*').order('name').then(({ data }) => setCats(data || []));
+    supabase.from('categories').select('*').eq('shop', shop).order('name').then(({ data }) => setCats(data || []));
   }, []);
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -35,7 +37,7 @@ export default function IntakePage() {
       if (!res.ok) throw new Error(data.error || 'Помилка');
 
       // зведення зі складом за кодом (sku) або назвою
-      const { data: products } = await supabase.from('products').select('id,name,sku,category_id');
+      const { data: products } = await supabase.from('products').select('id,name,sku,category_id').eq('shop', shop);
       const parsed: Row[] = data.items.map((i: any) => {
         const match = (products || []).find(p =>
           (i.code && p.sku && p.sku.toLowerCase() === i.code.toLowerCase()) ||
@@ -97,6 +99,7 @@ export default function IntakePage() {
         } else {
           // створити новий товар (без складу — склад через партію)
           const { data: created } = await supabase.from('products').insert({
+            shop,
             name: r.name, sku: r.code || null, stock: 0,
             purchase: r.purchase, extra_cost: r.extra_cost, price: priceNet,
             kind: 'Товар', category_id: catId,
@@ -148,7 +151,8 @@ export default function IntakePage() {
             </select>
           </div>
 
-          <table>
+          <div className="table-scroll">
+          <table style={{ minWidth: 1100 }}>
             <thead>
               <tr>
                 <th>Код</th><th>Назва</th><th>Категорія</th><th>К-сть</th><th>Закупка нетто</th><th>Доставка/од.</th>
@@ -161,10 +165,10 @@ export default function IntakePage() {
                 const profit = priceNet ? priceNet - r.purchase - r.extra_cost - priceNet * 3 / 100 : 0;
                 return (
                 <tr key={i}>
-                  <td data-label="Код"><input className="input" style={{ width: 110 }} value={r.code} onChange={e => upd(i, { code: e.target.value })} /></td>
-                  <td data-label="Назва"><input className="input" value={r.name} onChange={e => upd(i, { name: e.target.value })} /></td>
+                  <td data-label="Код"><input className="input" style={{ minWidth: 120 }} value={r.code} onChange={e => upd(i, { code: e.target.value })} /></td>
+                  <td data-label="Назва"><input className="input" style={{ minWidth: 240 }} value={r.name} onChange={e => upd(i, { name: e.target.value })} /></td>
                   <td data-label="Категорія">
-                    <select value={r.category_id} onChange={e => upd(i, { category_id: e.target.value })}>
+                    <select style={{ minWidth: 150 }} value={r.category_id} onChange={e => upd(i, { category_id: e.target.value })}>
                       <option value="">— без категорії</option>
                       {cats.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
@@ -186,6 +190,7 @@ export default function IntakePage() {
               })}
             </tbody>
           </table>
+          </div>
 
           <div className="row" style={{ marginTop: 16 }}>
             <button className="green" disabled={busy} onClick={commit}>

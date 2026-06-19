@@ -2,8 +2,11 @@
 import { useEffect, useState } from 'react';
 import { supabase, money } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
+import { useShop } from '../../lib/shop';
 
 export default function MotivationPage() {
+  const { slug: shop, currency } = useShop();
+  const mm = (v: number) => money(v, currency);
   const { role, email } = useAuth();
   const owner = role === 'owner';
   const [rows, setRows] = useState<any[]>([]);
@@ -25,7 +28,7 @@ export default function MotivationPage() {
     // перший день наступного місяця — надійна верхня межа для будь-якого місяця
     const [y, m] = month.split('-').map(Number);
     const next = m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, '0')}-01`;
-    const { data, error } = await supabase.from('bonuses').select('*')
+    const { data, error } = await supabase.from('bonuses').select('*').eq('shop', shop)
       .gte('created_at', from).lt('created_at', next)
       .order('created_at', { ascending: false });
     if (error) setErr(error.message);
@@ -53,6 +56,7 @@ export default function MotivationPage() {
     }
 
     const { error } = await supabase.from('bonuses').insert({
+      shop,
       seller_id: sellerId,
       seller_email: sellerEmail,
       kind: 'promo',
@@ -94,9 +98,9 @@ export default function MotivationPage() {
 
       {/* Підсумки */}
       <div className="grid">
-        <div className="card"><h3>Всього за місяць</h3><div className="value green">{money(total)}</div></div>
-        <div className="card"><h3>Аксесуари (5%)</h3><div className="value">{money(accTotal)}</div></div>
-        <div className="card"><h3>Промокоди</h3><div className="value">{money(promoTotal)}</div></div>
+        <div className="card"><h3>Всього за місяць</h3><div className="value green">{mm(total)}</div></div>
+        <div className="card"><h3>Аксесуари (5%)</h3><div className="value">{mm(accTotal)}</div></div>
+        <div className="card"><h3>Промокоди</h3><div className="value">{mm(promoTotal)}</div></div>
       </div>
 
       {/* Власник: розбивка по продавцях */}
@@ -104,7 +108,7 @@ export default function MotivationPage() {
         <div className="card" style={{ marginBottom: 20 }}>
           <h3>За продавцями</h3>
           {Object.entries(bySeller).map(([em, sum]) => (
-            <div key={em} className="stock-row"><span>{em}</span><b style={{ color: '#16a34a' }}>{money(sum)}</b></div>
+            <div key={em} className="stock-row"><span>{em}</span><b style={{ color: '#16a34a' }}>{mm(sum)}</b></div>
           ))}
         </div>
       )}
@@ -128,7 +132,7 @@ export default function MotivationPage() {
               <td data-label="Тип">{r.kind === 'accessory'
                 ? <span className="badge ok">Аксесуар 5%</span>
                 : <span className="tag">Промокод</span>}</td>
-              <td data-label="Сума" style={{ color: '#16a34a', fontWeight: 600 }}>{money(r.amount)}</td>
+              <td data-label="Сума" style={{ color: '#16a34a', fontWeight: 600 }}>{mm(r.amount)}</td>
               <td data-label="Коментар">{r.note || '—'}</td>
               {owner && <td className="actions" data-label="Дії"><button className="danger" onClick={() => del(r.id)}>🗑</button></td>}
             </tr>

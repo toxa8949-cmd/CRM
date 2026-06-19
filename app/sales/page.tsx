@@ -2,11 +2,14 @@
 import { useEffect, useState, Fragment } from 'react';
 import { supabase, money, exportCSV, type Sale } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
+import { useShop } from '../../lib/shop';
 
 const PAYMENTS = ['Готівка', 'Картка', 'Переказ', 'Накладений платіж'];
 
 export default function SalesPage() {
   const { role } = useAuth();
+  const { slug: shop, currency, hasVat } = useShop();
+  const mm = (v: number) => money(v, currency);
   const owner = role === 'owner';
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,7 +25,7 @@ export default function SalesPage() {
   const [manErr, setManErr] = useState('');
   const [manBusy, setManBusy] = useState(false);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [shop]);
 
   async function load() {
     setLoading(true);
@@ -30,15 +33,16 @@ export default function SalesPage() {
       const { data } = await supabase
         .from('sales')
         .select('*,customers(name),sale_items(*)')
+        .eq('shop', shop)
         .order('created_at', { ascending: false })
         .limit(500);
       setSales(data || []);
     } else {
       // продавець: безпечні VIEW без прибутку/собівартості
       const [{ data: s }, { data: items }, { data: custs }] = await Promise.all([
-        supabase.from('sales_safe').select('*').order('created_at', { ascending: false }).limit(500),
-        supabase.from('sale_items_safe').select('*'),
-        supabase.from('customers').select('id,name'),
+        supabase.from('sales_safe').select('*').eq('shop', shop).order('created_at', { ascending: false }).limit(500),
+        supabase.from('sale_items_safe').select('*').eq('shop', shop),
+        supabase.from('customers').select('id,name').eq('shop', shop),
       ]);
       const custMap = new Map((custs || []).map((c: any) => [c.id, c.name]));
       const itemsBySale = new Map<number, any[]>();
@@ -85,6 +89,7 @@ export default function SalesPage() {
       p_qty: qty,
       p_date: pDate,
       p_payment: man.payment,
+      p_shop: shop,
     });
     setManBusy(false);
     if (error) { setManErr(error.message); return; }
@@ -95,7 +100,7 @@ export default function SalesPage() {
 
   async function pay(s: Sale) {
     const debt = s.total - s.paid;
-    const amt = Number(prompt(`Довнести по чеку #${s.id}. Борг ${debt.toFixed(2)} zł. Сума:`, debt.toFixed(2)));
+    const amt = Number(prompt(`Довнести по чеку #${s.id}. Борг ${debt.toFixed(2)} ${currency}. Сума:`, debt.toFixed(2)));
     if (!amt || amt <= 0) return;
     await supabase.rpc('add_payment', { p_sale_id: s.id, p_amount: amt });
     load();
@@ -116,10 +121,10 @@ export default function SalesPage() {
 
   function printReceipt(s: Sale) {
     const items = (s.sale_items || []).map((it: any) => {
-      const sum = it.item_kind === 'Сервіс' ? it.price * 1.23 : it.qty * it.price * 1.23;
+      const sum = it.item_kind === 'Сервіс' ? it.price * (hasVat?1.23:1) : it.qty * it.price * (hasVat?1.23:1);
       const name = (it.item_kind === 'Сервіс' ? 'Сервіс: ' : '') + it.product_name;
       const q = it.item_kind === 'Сервіс' ? '1' : it.qty;
-      return `<tr><td>${name}</td><td style="text-align:center">${q}</td><td style="text-align:right">${sum.toFixed(2)} zł</td></tr>`;
+      return `<tr><td>${name}</td><td style="text-align:center">${q}</td><td style="text-align:right">${sum.toFixed(2)} ${currency}</td></tr>`;
     }).join('');
     const w = window.open('', '_blank', 'width=380,height=600');
     if (!w) return;
@@ -137,10 +142,10 @@ export default function SalesPage() {
       <div class="muted">Чек #${s.id} · ${new Date(s.created_at).toLocaleString('uk-UA')}</div>
       ${s.customers?.name ? `<div class="muted">Клієнт: ${s.customers.name}</div>` : ''}
       <table>${items}</table>
-      ${s.discount > 0 ? `<div class="tot"><span>Знижка</span><span>-${Number(s.discount).toFixed(2)} zł</span></div>` : ''}
-      <div class="tot big"><span>До сплати</span><span>${Number(s.total).toFixed(2)} zł</span></div>
-      <div class="tot"><span>Сплачено</span><span>${Number(s.paid).toFixed(2)} zł</span></div>
-      ${(s.total - s.paid) > 0 ? `<div class="tot"><span>Борг</span><span>${(s.total - s.paid).toFixed(2)} zł</span></div>` : ''}
+      ${s.discount > 0 ? `<div class="tot"><span>Знижка</span><span>-${Number(s.discount).toFixed(2)} ${currency}</span></div>` : ''}
+      <div class="tot big"><span>До сплати</span><span>${Number(s.total).toFixed(2)} ${currency}</span></div>
+      <div class="tot"><span>Сплачено</span><span>${Number(s.paid).toFixed(2)} ${currency}</span></div>
+      ${(s.total - s.paid) > 0 ? `<div class="tot"><span>Борг</span><span>${(s.total - s.paid).toFixed(2)} ${currency}</span></div>` : ''}
       <div class="tot"><span>Оплата</span><span>${s.payment}</span></div>
       <div class="muted" style="margin-top:16px">Дякуємо за покупку!</div>
       <script>window.print()</script>
@@ -232,8 +237,8 @@ export default function SalesPage() {
           <button className="green" disabled={manBusy} onClick={addManual}>{manBusy ? '…' : 'Зберегти'}</button>
           {man.brutto && Number(man.brutto) > 0 && (
             <div className="muted" style={{ gridColumn: '1/-1', fontSize: 13 }}>
-              Нетто: {money(Number(man.brutto) / 1.23 * (Number(man.qty) || 1))} ·
-              Прибуток: <b style={{ color: '#16a34a' }}>{money((Number(man.brutto) / 1.23 - (Number(man.purchase) || 0)) * (Number(man.qty) || 1) - (Number(man.brutto) / 1.23 * (Number(man.qty) || 1)) * 0.03)}</b>
+              Нетто: {mm(Number(man.brutto) / (hasVat?1.23:1) * (Number(man.qty) || 1))} ·
+              Прибуток: <b style={{ color: '#16a34a' }}>{mm((Number(man.brutto) / (hasVat?1.23:1) - (Number(man.purchase) || 0)) * (Number(man.qty) || 1) - (hasVat ? (Number(man.brutto) / 1.23 * (Number(man.qty) || 1)) * 0.03 : 0))}</b>
               <span style={{ marginLeft: 8 }}>· склад не змінюється</span>
             </div>
           )}
@@ -254,11 +259,11 @@ export default function SalesPage() {
                   ? <span className="badge out">Повернення</span>
                   : <span className="badge ok">Завершено</span>}</td>
                 <td data-label="Оплата">{s.status === 'Повернення' ? '—' : payBadge(s)}</td>
-                <td data-label="Сума">{money(s.total)}{s.discount > 0 && <div className="muted" style={{ fontSize: 12 }}>знижка −{money(s.discount)}</div>}</td>
+                <td data-label="Сума">{mm(s.total)}{s.discount > 0 && <div className="muted" style={{ fontSize: 12 }}>знижка −{mm(s.discount)}</div>}</td>
                 <td data-label="Борг" style={{ color: (s.total - s.paid) > 0 ? '#dc2626' : '#9ca3af' }}>
-                  {money(Math.max(0, s.total - s.paid))}
+                  {mm(Math.max(0, s.total - s.paid))}
                 </td>
-                {owner && <td data-label="Прибуток" style={{ color: '#16a34a' }}>{money(s.profit)}</td>}
+                {owner && <td data-label="Прибуток" style={{ color: '#16a34a' }}>{mm(s.profit)}</td>}
                 <td className="actions" data-label="Дії">
                   <div className="cell-actions">
                   <button className="ghost" onClick={() => setOpen(open === s.id ? null : s.id)}>
@@ -300,14 +305,14 @@ export default function SalesPage() {
                       <div key={it.id} style={{ padding: '4px 0' }}>
                         {it.item_kind === 'Сервіс' ? '🔧 ' : ''}{it.product_name}
                         {it.item_kind === 'Сервіс'
-                          ? <> (сервіс) — <b>{money(it.price * 1.23)}</b> <span className="muted">брутто</span></>
-                          : <> — {it.qty} × {money(it.price)} нетто = <b>{money(it.qty * it.price)}</b></>}
+                          ? <> (сервіс) — <b>{mm(it.price * (hasVat?1.23:1))}</b> <span className="muted">{hasVat?"брутто":""}</span></>
+                          : <> — {it.qty} × {mm(it.price)} нетто = <b>{mm(it.qty * it.price)}</b></>}
                       </div>
                     ))}
                     {s.note && <div className="muted">Примітка: {s.note}</div>}
                     <div className="muted" style={{ marginTop: 6 }}>
-                      Оплата: {s.payment} · Сплачено {money(s.paid)} з {money(s.total)}
-                      {(s.total - s.paid) > 0 && <> · <span style={{ color: '#dc2626' }}>борг {money(s.total - s.paid)}</span></>}
+                      Оплата: {s.payment} · Сплачено {mm(s.paid)} з {mm(s.total)}
+                      {(s.total - s.paid) > 0 && <> · <span style={{ color: '#dc2626' }}>борг {mm(s.total - s.paid)}</span></>}
                     </div>
                   </td>
                 </tr>

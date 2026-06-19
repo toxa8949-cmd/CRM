@@ -4,6 +4,7 @@ body{margin:0;font-family:system-ui,Arial,sans-serif;background:#f4f6f8;color:#1
 .sidebar h1{font-size:22px;margin:0 0 28px}
 .sidebar nav{display:flex;flex-direction:column;gap:8px}
 .side-user{margin-top:24px;padding-top:16px;border-top:1px solid #1f2937;color:#fff}
+.shop-switch{width:100%;margin-bottom:16px;padding:10px;border-radius:10px;background:#1f2937;color:#fff;border:1px solid #374151;font-size:14px;font-weight:600}
 .sidebar a{color:#fff;text-decoration:none;padding:11px 14px;border-radius:10px;background:#1f2937;display:flex;align-items:center;gap:10px;font-size:15px}
 .sidebar a:hover{background:#2563eb}
 .ico{font-size:16px}

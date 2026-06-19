@@ -1,21 +1,24 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase, money, todayISO, exportCSV, type Expense } from '../../lib/supabase';
+import { useShop } from '../../lib/shop';
 
 const CATS = ['Реклама', 'Оренда', 'Зарплата', 'Бухгалтер', 'Закупівля', 'Доставка', 'Податки', 'Інше'];
 
 export default function ExpensesPage() {
+  const { slug: shop, currency } = useShop();
+  const mm = (v: number) => money(v, currency);
   const [list, setList] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [form, setForm] = useState({ category: 'Реклама', amount: '', description: '', spent_at: todayISO() });
   const [edit, setEdit] = useState<Expense | null>(null);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [shop]);
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase.from('expenses').select('*').order('spent_at', { ascending: false }).limit(300);
+    const { data } = await supabase.from('expenses').select('*').eq('shop', shop).order('spent_at', { ascending: false }).limit(300);
     setList(data || []); setLoading(false);
   }
 
@@ -23,6 +26,7 @@ export default function ExpensesPage() {
     setErr('');
     if (!form.amount) return setErr('Вкажіть суму');
     const { error } = await supabase.from('expenses').insert({
+      shop,
       category: form.category, amount: Number(form.amount),
       description: form.description || null, spent_at: form.spent_at,
     });
@@ -58,7 +62,7 @@ export default function ExpensesPage() {
   return (
     <>
       <h2>Витрати</h2>
-      <p className="muted">Усього у списку: {money(total)}</p>
+      <p className="muted">Усього у списку: {mm(total)}</p>
       {err && <div className="err">{err}</div>}
 
       <div className="form">
@@ -98,7 +102,7 @@ export default function ExpensesPage() {
             <tr key={e.id}>
               <td data-label="Дата">{e.spent_at}</td>
               <td data-label="Категорія"><span className="tag">{e.category}</span></td>
-              <td data-label="Сума" style={{ color: '#dc2626' }}>{money(e.amount)}</td>
+              <td data-label="Сума" style={{ color: '#dc2626' }}>{mm(e.amount)}</td>
               <td data-label="Опис">{e.description || '—'}</td>
               <td className="actions" data-label="Дії"><div className="cell-actions">
                 <button className="ghost" onClick={() => setEdit(e)}>✎</button>

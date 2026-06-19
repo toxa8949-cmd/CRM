@@ -2,10 +2,10 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, SHOPS } from '../lib/supabase';
 import { AuthProvider, useAuth } from '../lib/auth';
+import { ShopProvider } from '../lib/shop';
 
-// owner: усі пункти; seller: лише дозволені
 const NAV = [
   { href: '/', label: 'Панель', icon: '📊', seller: true },
   { href: '/sales', label: 'Продажі', icon: '🧾', seller: true },
@@ -18,15 +18,34 @@ const NAV = [
   { href: '/reports', label: 'Звіти', icon: '📈', seller: false },
   { href: '/settings', label: 'Категорії', icon: '⚙️', seller: false },
 ];
-// сторінки, заборонені продавцю (захист від ручного вводу URL)
 const OWNER_ONLY = ['/intake', '/expenses', '/reports', '/settings'];
 
 function Inner({ children }: { children: ReactNode }) {
-  const { role, email, ready } = useAuth();
+  const { role, email, ready, shopAccess } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const isLogin = pathname === '/login';
   const [menuOpen, setMenuOpen] = useState(false);
+  const [shop, setShop] = useState('rower');
+
+  const myShops = shopAccess === 'all' ? SHOPS : SHOPS.filter(s => s.slug === shopAccess);
+
+  useEffect(() => {
+    if (!ready || !role) return;
+    let saved = '';
+    try { saved = localStorage.getItem('activeShop') || ''; } catch {}
+    const allowed = myShops.map(s => s.slug);
+    const initial = allowed.includes(saved) ? saved : (allowed[0] || 'rower');
+    setShop(initial);
+  }, [ready, role, shopAccess]);
+
+  function switchShop(slug: string) {
+    setShop(slug);
+    try { localStorage.setItem('activeShop', slug); } catch {}
+    setMenuOpen(false);
+    // перезавантаження, щоб усі сторінки підхопили новий магазин
+    window.location.href = '/';
+  }
 
   useEffect(() => { setMenuOpen(false); }, [pathname]);
 
@@ -36,13 +55,12 @@ function Inner({ children }: { children: ReactNode }) {
     if (role === 'seller' && OWNER_ONLY.includes(pathname)) { router.replace('/'); }
   }, [ready, role, pathname, isLogin, router]);
 
-  // сторінка входу — без сайдбару
   if (isLogin) return <main className="content" style={{ marginLeft: 0, width: '100%' }}>{children}</main>;
-
   if (!ready) return <main className="content" style={{ marginLeft: 0, width: '100%' }}><div className="loading">Завантаження…</div></main>;
   if (!role) return <main className="content" style={{ marginLeft: 0, width: '100%' }}><div className="loading">Перенаправлення…</div></main>;
 
   const items = NAV.filter(n => role === 'owner' || n.seller);
+  const shopName = SHOPS.find(s => s.slug === shop)?.name || 'Rower Express';
 
   async function logout() {
     await supabase.auth.signOut();
@@ -50,21 +68,26 @@ function Inner({ children }: { children: ReactNode }) {
   }
 
   return (
-    <>
-      {/* Мобільний топбар (видно тільки на телефоні через CSS) */}
+    <ShopProvider slug={shop}>
       <header className="topbar">
         <button className="burger" onClick={() => setMenuOpen(!menuOpen)} aria-label="Меню">
           {menuOpen ? '✕' : '☰'}
         </button>
-        <span className="topbar-title">Rower CRM</span>
+        <span className="topbar-title">{shopName}</span>
         <button className="ghost topbar-exit" onClick={logout}>Вийти</button>
       </header>
 
-      {/* Затемнення під меню */}
       {menuOpen && <div className="menu-overlay" onClick={() => setMenuOpen(false)} />}
 
       <aside className={'sidebar' + (menuOpen ? ' open' : '')}>
-        <h1>Rower CRM</h1>
+        <h1>{shopName}</h1>
+
+        {myShops.length > 1 && (
+          <select className="shop-switch" value={shop} onChange={e => switchShop(e.target.value)}>
+            {myShops.map(s => <option key={s.slug} value={s.slug}>{s.name}</option>)}
+          </select>
+        )}
+
         <nav>
           {items.map(n => (
             <Link key={n.href} href={n.href}><span className="ico">{n.icon}</span>{n.label}</Link>
@@ -77,7 +100,7 @@ function Inner({ children }: { children: ReactNode }) {
         </div>
       </aside>
       <main className="content">{children}</main>
-    </>
+    </ShopProvider>
   );
 }
 

@@ -2,10 +2,15 @@
 import { useEffect, useState } from 'react';
 import { supabase, money, brutto, net, taxRate, type Product, type Category } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
+import { useShop } from '../../lib/shop';
 
 export default function ProductsPage() {
   const { role } = useAuth();
+  const { slug: shop, currency, hasVat } = useShop();
   const owner = role === 'owner';
+  const m = (v: number) => money(v, currency);
+  const toBrutto = (n: number) => hasVat ? brutto(n) : n;
+  const toNet = (g: number) => hasVat ? net(g) : g;
   const [products, setProducts] = useState<Product[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -22,15 +27,15 @@ export default function ProductsPage() {
   const [edit, setEdit] = useState<Product | null>(null);
   const [editBrutto, setEditBrutto] = useState(''); // ціна брутто в режимі редагування
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [shop]);
   useEffect(() => { setPage(1); }, [search, fCat, fStock, sort]);
 
   async function load() {
     setLoading(true);
     const tableP = owner ? 'products' : 'products_safe';
     const [{ data: p }, { data: c }] = await Promise.all([
-      supabase.from(tableP).select('*,categories(name)').order('name'),
-      supabase.from('categories').select('*').order('name'),
+      supabase.from(tableP).select('*,categories(name)').eq('shop', shop).order('name'),
+      supabase.from('categories').select('*').eq('shop', shop).order('name'),
     ]);
     setProducts(p || []); setCats(c || []); setLoading(false);
   }
@@ -46,6 +51,7 @@ export default function ProductsPage() {
       stock: Number(form.stock) || 0,
       purchase: Number(form.purchase) || 0,
       price: priceNet,
+      shop,
       low_stock: Number(form.low_stock) || 2,
       kind: form.kind,
       extra_cost: Number(form.extra_cost) || 0,
@@ -58,12 +64,12 @@ export default function ProductsPage() {
 
   function startEdit(p: Product) {
     setEdit(p);
-    setEditBrutto(brutto(p.price).toFixed(2));
+    setEditBrutto(toBrutto(p.price).toFixed(2));
   }
 
   async function saveEdit() {
     if (!edit) return;
-    const priceNet = editBrutto ? Math.round(net(Number(editBrutto)) * 100) / 100 : edit.price;
+    const priceNet = editBrutto ? Math.round(toNet(Number(editBrutto)) * 100) / 100 : edit.price;
     const { error } = await supabase.from('products').update({
       name: edit.name, category_id: edit.category_id, sku: edit.sku,
       stock: edit.stock, purchase: edit.purchase, price: priceNet, low_stock: edit.low_stock,
@@ -108,9 +114,9 @@ export default function ProductsPage() {
   // сортування
   const sorted = [...filteredAll].sort((a, b) => {
     if (sort === 'stock') return a.stock - b.stock;
-    if (sort === 'price') return brutto(Number(b.price)) - brutto(Number(a.price));
+    if (sort === 'price') return toBrutto(Number(b.price)) - toBrutto(Number(a.price));
     if (sort === 'profit') {
-      const pf = (p: Product) => Number(p.price) - Number(p.purchase) - Number((p as any).extra_cost || 0) - Number(p.price) * taxRate(p.kind) / 100;
+      const pf = (p: Product) => Number(p.price) - Number(p.purchase) - Number((p as any).extra_cost || 0) - (hasVat ? Number(p.price) * taxRate(p.kind) / 100 : 0);
       return pf(b) - pf(a);
     }
     return a.name.localeCompare(b.name);
@@ -124,7 +130,7 @@ export default function ProductsPage() {
   // підсумки — по відфільтрованих (аналітика по обраній категорії)
   const base = filteredAll;
   const totalPurchase = base.reduce((a, p) => a + p.stock * Number(p.purchase), 0);
-  const totalRetail = base.reduce((a, p) => a + p.stock * brutto(Number(p.price)), 0);
+  const totalRetail = base.reduce((a, p) => a + p.stock * toBrutto(Number(p.price)), 0);
   const lowCount = base.filter(p => p.stock > 0 && p.stock <= p.low_stock).length;
   const outCount = base.filter(p => p.stock <= 0).length;
 
@@ -155,8 +161,8 @@ export default function ProductsPage() {
       {/* Підсумки (по обраному фільтру) */}
       <div className="grid">
         <div className="card"><h3>Позицій{fCat ? ' (категорія)' : ''}</h3><div className="value">{base.length}</div></div>
-        {owner && <div className="card"><h3>Вартість (закупка)</h3><div className="value">{money(totalPurchase)}</div></div>}
-        <div className="card"><h3>Вартість (роздріб, брутто)</h3><div className="value blue">{money(totalRetail)}</div></div>
+        {owner && <div className="card"><h3>Вартість (закупка)</h3><div className="value">{m(totalPurchase)}</div></div>}
+        <div className="card"><h3>Вартість (роздріб, брутто)</h3><div className="value blue">{m(totalRetail)}</div></div>
         <div className="card"><h3>Закінчується / немає</h3>
           <div className="value"><span style={{ color: lowCount ? '#d97706' : '#9ca3af' }}>{lowCount}</span> <span className="muted">/</span> <span style={{ color: outCount ? '#dc2626' : '#9ca3af' }}>{outCount}</span></div>
         </div>
@@ -230,7 +236,7 @@ export default function ProductsPage() {
               <td><input className="input" type="number" style={{ width: 90 }} value={edit!.purchase} onChange={e => setEdit({ ...edit!, purchase: Number(e.target.value) })} /></td>
               <td>
                 <input className="input" type="number" style={{ width: 100 }} placeholder="брутто" value={editBrutto} onChange={e => setEditBrutto(e.target.value)} />
-                <div className="muted" style={{ fontSize: 11 }}>{editBrutto ? money(net(Number(editBrutto))) + ' нетто' : ''}</div>
+                <div className="muted" style={{ fontSize: 11 }}>{editBrutto ? m(toNet(Number(editBrutto))) + ' нетто' : ''}</div>
               </td>
               <td>—</td>
               <td className="actions"><div className="cell-actions">
@@ -248,13 +254,13 @@ export default function ProductsPage() {
               </td>
               <td data-label="Категорія">{p.categories?.name || <span className="muted">—</span>}</td>
               <td data-label="Залишок">{stockBadge(p)}</td>
-              {owner && <td data-label="Закупка">{money(p.purchase)}{p.extra_cost ? <div className="muted" style={{ fontSize: 11 }}>+{money(p.extra_cost)} дост.</div> : null}</td>}
+              {owner && <td data-label="Закупка">{m(p.purchase)}{p.extra_cost ? <div className="muted" style={{ fontSize: 11 }}>+{m(p.extra_cost)} дост.</div> : null}</td>}
               <td data-label="Ціна продажу">
-                <div style={{ fontWeight: 600 }}>{money(brutto(p.price))}</div>
-                <div className="muted" style={{ fontSize: 11 }}>{money(p.price)} нетто</div>
+                <div style={{ fontWeight: 600 }}>{m(toBrutto(p.price))}</div>
+                <div className="muted" style={{ fontSize: 11 }}>{m(p.price)} нетто</div>
               </td>
               {owner && <td data-label="Чистий/од." style={{ color: '#16a34a', fontWeight: 600 }}>
-                {money(p.price - p.purchase - (p.extra_cost || 0) - p.price * taxRate(p.kind) / 100)}
+                {m(p.price - p.purchase - (p.extra_cost || 0) - (hasVat ? p.price * taxRate(p.kind) / 100 : 0))}
               </td>}
               {owner && <td className="actions" data-label="Дії">
                 <div className="cell-actions">

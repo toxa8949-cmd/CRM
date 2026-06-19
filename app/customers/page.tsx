@@ -1,19 +1,22 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase, money, exportCSV, type Customer } from '../../lib/supabase';
+import { useShop } from '../../lib/shop';
 
 export default function CustomersPage() {
+  const { slug: shop, currency } = useShop();
+  const mm = (v: number) => money(v, currency);
   const [list, setList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [form, setForm] = useState({ name: '', phone: '', email: '', note: '' });
   const [edit, setEdit] = useState<Customer | null>(null);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [shop]);
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase.from('customers').select('*,sales(total)').order('name');
+    const { data } = await supabase.from('customers').select('*,sales(total)').eq('shop', shop).order('name');
     setList((data || []).map((c: any) => ({
       ...c,
       orders: c.sales?.length || 0,
@@ -26,6 +29,7 @@ export default function CustomersPage() {
     setErr('');
     if (!form.name.trim()) return setErr('Вкажіть ім’я');
     const { error } = await supabase.from('customers').insert({
+      shop,
       name: form.name.trim(), phone: form.phone || null, email: form.email || null, note: form.note || null,
     });
     if (error) return setErr(error.message);
@@ -92,7 +96,7 @@ export default function CustomersPage() {
               <td data-label="Телефон">{c.phone || '—'}</td>
               <td data-label="Email">{c.email || '—'}</td>
               <td data-label="Замовлень">{c.orders}</td>
-              <td data-label="Витрачено">{money(c.spent)}</td>
+              <td data-label="Витрачено">{mm(c.spent)}</td>
               <td className="actions" data-label="Дії"><div className="cell-actions">
                 <button className="ghost" onClick={() => setEdit(c)}>✎</button>
                 <button className="danger" onClick={() => del(c)}>🗑</button>

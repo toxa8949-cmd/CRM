@@ -5,8 +5,16 @@ export const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
-export const money = (v: number) =>
-  `${Number(v || 0).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} zł`;
+export const money = (v: number, currency = 'zł') =>
+  `${Number(v || 0).toLocaleString('pl-PL', { minimumFractionDigits: 0, maximumFractionDigits: 2 })} ${currency}`;
+
+// магазини: маршрут → slug
+export const SHOPS = [
+  { slug: 'rower', path: '/', name: 'Rower Express', currency: 'zł', hasVat: true },
+  { slug: 'dobrobud', path: '/dobrobud', name: 'Добробуд', currency: '₴', hasVat: false },
+  { slug: 'velokrai', path: '/velokrai', name: 'Велокрай', currency: '₴', hasVat: false },
+];
+export const shopBySlug = (slug: string) => SHOPS.find(s => s.slug === slug) || SHOPS[0];
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
 

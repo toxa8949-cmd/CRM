@@ -1,19 +1,21 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase, type Category } from '../../lib/supabase';
+import { useShop } from '../../lib/shop';
 
 export default function SettingsPage() {
+  const { slug: shop } = useShop();
   const [cats, setCats] = useState<any[]>([]);
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [shop]);
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase.from('categories').select('*,products(id)').order('name');
+    const { data } = await supabase.from('categories').select('*,products(id)').eq('shop', shop).order('name');
     setCats((data || []).map((c: any) => ({ ...c, count: c.products?.length || 0 })));
     setLoading(false);
   }
@@ -22,6 +24,7 @@ export default function SettingsPage() {
     setErr('');
     if (!name.trim()) return;
     const { error } = await supabase.from('categories').insert({
+      shop,
       name: name.trim(),
       parent_id: parentId ? Number(parentId) : null,
     });

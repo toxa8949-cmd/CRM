@@ -3,18 +3,28 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { supabase } from './supabase';
 
 type Role = 'owner' | 'seller' | null;
-type AuthState = { role: Role; email: string | null; ready: boolean };
+type AuthState = {
+  role: Role;
+  email: string | null;
+  ready: boolean;
+  shopAccess: string;   // 'all' (суперадмін) або конкретний slug
+};
 
-const Ctx = createContext<AuthState>({ role: null, email: null, ready: false });
+const Ctx = createContext<AuthState>({ role: null, email: null, ready: false, shopAccess: 'rower' });
+
+const SUPER_ADMIN = 'toxa8949@gmail.com';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<AuthState>({ role: null, email: null, ready: false });
+  const [state, setState] = useState<AuthState>({ role: null, email: null, ready: false, shopAccess: 'rower' });
 
   useEffect(() => {
     function apply(session: any) {
       const user = session?.user;
       const role = (user?.user_metadata?.role as Role) || (user ? 'seller' : null);
-      setState({ role, email: user?.email ?? null, ready: true });
+      const email = user?.email ?? null;
+      // суперадмін бачить усі магазини; інші — свій (з metadata.shop, дефолт rower)
+      const shopAccess = email === SUPER_ADMIN ? 'all' : (user?.user_metadata?.shop || 'rower');
+      setState({ role, email, ready: true, shopAccess });
     }
     supabase.auth.getSession().then(({ data }) => apply(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => apply(session));
