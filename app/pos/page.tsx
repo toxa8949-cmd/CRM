@@ -21,6 +21,7 @@ export default function PosPage() {
   const [cats, setCats] = useState<any[]>([]);
   const [quick, setQuick] = useState<any[]>([]);  // швидкі товари в чеку
   const [qForm, setQForm] = useState({ name: '', purchase: '', brutto: '', qty: '1', category_id: '' });
+  const [openExtra, setOpenExtra] = useState<'none' | 'service' | 'quick'>('none');
   const [svcDesc, setSvcDesc] = useState('');
   const [svcPrice, setSvcPrice] = useState('');
   const [search, setSearch] = useState('');
@@ -201,46 +202,60 @@ export default function PosPage() {
             {filtered.length === 0 && <div className="loading">Нічого не знайдено</div>}
           </div>
 
-          <div className="cart" style={{ marginTop: 16 }}>
-            <h3 style={{ marginTop: 0 }}>Додати сервіс</h3>
-            <input className="input" placeholder="Що зроблено (від руки)" value={svcDesc} onChange={e => setSvcDesc(e.target.value)} style={{ marginBottom: 10 }} />
-            <div style={{ display: 'flex', gap: 10 }}>
-              <input className="input" type="number" placeholder="Вартість брутто" value={svcPrice} onChange={e => setSvcPrice(e.target.value)} onKeyDown={e => e.key === 'Enter' && addService()} />
-              <button className="ghost" onClick={addService}>Додати</button>
-            </div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>{hasVat ? "Ціна з ПДВ. Податок з обороту 8%, собівартість 0." : "Ціна продажу, собівартість 0."}</div>
+          {/* Кнопки розкриття додаткових блоків */}
+          <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
+            <button className={openExtra === 'service' ? '' : 'ghost'} style={{ flex: 1 }}
+              onClick={() => setOpenExtra(openExtra === 'service' ? 'none' : 'service')}>
+              + Сервіс / робота
+            </button>
+            <button className={openExtra === 'quick' ? '' : 'ghost'} style={{ flex: 1 }}
+              onClick={() => setOpenExtra(openExtra === 'quick' ? 'none' : 'quick')}>
+              + Швидкий товар
+            </button>
           </div>
 
-          <div className="cart" style={{ marginTop: 16 }}>
-            <h3 style={{ marginTop: 0 }}>Швидкий товар <span className="muted" style={{ fontSize: 12, fontWeight: 400 }}>(якого немає в каталозі)</span></h3>
-            <input className="input" placeholder="Назва товару" value={qForm.name} onChange={e => setQForm({ ...qForm, name: e.target.value })} style={{ marginBottom: 8 }} />
-            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-              <input className="input" type="number" placeholder="Закупка" value={qForm.purchase} onChange={e => setQForm({ ...qForm, purchase: e.target.value })} />
-              <input className="input" type="number" placeholder="Продаж" value={qForm.brutto} onChange={e => setQForm({ ...qForm, brutto: e.target.value })} />
-              <input className="input" type="number" placeholder="К-сть" value={qForm.qty} onChange={e => setQForm({ ...qForm, qty: e.target.value })} style={{ maxWidth: 80 }} />
-            </div>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <select value={qForm.category_id} onChange={e => setQForm({ ...qForm, category_id: e.target.value })}>
-                <option value="">— категорія (для бонусу) —</option>
-                {cats.map(c => <option key={c.id} value={c.id}>{c.parent_id ? '↳ ' : ''}{c.name}</option>)}
-              </select>
-              <button className="ghost" onClick={addQuick}>Додати</button>
-            </div>
-            {quick.length > 0 && (
-              <div style={{ marginTop: 10 }}>
-                {quick.map((q, i) => (
-                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #eee', fontSize: 14 }}>
-                    <span>{q.name} × {q.qty} <span className="muted">(закуп {q.purchase})</span></span>
-                    <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <b>{mm(q.brutto * q.qty)}</b>
-                      <button className="danger" style={{ padding: '2px 8px' }} onClick={() => removeQuick(i)}>×</button>
-                    </span>
-                  </div>
-                ))}
+          {openExtra === 'service' && (
+            <div className="cart" style={{ marginTop: 12 }}>
+              <input className="input" placeholder="Що зроблено (від руки)" value={svcDesc} onChange={e => setSvcDesc(e.target.value)} style={{ marginBottom: 10 }} />
+              <div style={{ display: 'flex', gap: 10 }}>
+                <input className="input" type="number" placeholder={hasVat ? 'Вартість брутто' : 'Вартість'} value={svcPrice} onChange={e => setSvcPrice(e.target.value)} onKeyDown={e => e.key === 'Enter' && addService()} />
+                <button className="ghost" onClick={addService}>Додати</button>
               </div>
-            )}
-            <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>Разова продажа без створення товару. Прибуток і бонус — як звичайно.</div>
-          </div>
+              <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>{hasVat ? 'Ціна з ПДВ. Податок з обороту 8%, собівартість 0.' : 'Ціна продажу, собівартість 0.'}</div>
+            </div>
+          )}
+
+          {openExtra === 'quick' && (
+            <div className="cart" style={{ marginTop: 12 }}>
+              <div className="muted" style={{ fontSize: 12, marginBottom: 8 }}>Товар, якого немає в каталозі. Разова продажа, прибуток і бонус — як звичайно.</div>
+              <input className="input" placeholder="Назва товару" value={qForm.name} onChange={e => setQForm({ ...qForm, name: e.target.value })} style={{ marginBottom: 8 }} />
+              <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                <input className="input" type="number" placeholder="Закупка" value={qForm.purchase} onChange={e => setQForm({ ...qForm, purchase: e.target.value })} />
+                <input className="input" type="number" placeholder="Продаж" value={qForm.brutto} onChange={e => setQForm({ ...qForm, brutto: e.target.value })} />
+                <input className="input" type="number" placeholder="К-сть" value={qForm.qty} onChange={e => setQForm({ ...qForm, qty: e.target.value })} style={{ maxWidth: 80 }} />
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <select value={qForm.category_id} onChange={e => setQForm({ ...qForm, category_id: e.target.value })}>
+                  <option value="">— категорія (для бонусу) —</option>
+                  {cats.map(c => <option key={c.id} value={c.id}>{c.parent_id ? '↳ ' : ''}{c.name}</option>)}
+                </select>
+                <button className="ghost" onClick={addQuick}>Додати</button>
+              </div>
+              {quick.length > 0 && (
+                <div style={{ marginTop: 10 }}>
+                  {quick.map((q, i) => (
+                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #eee', fontSize: 14 }}>
+                      <span>{q.name} × {q.qty} <span className="muted">(закуп {q.purchase})</span></span>
+                      <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <b>{mm(q.brutto * q.qty)}</b>
+                        <button className="danger" style={{ padding: '2px 8px' }} onClick={() => removeQuick(i)}>×</button>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="cart">
@@ -268,7 +283,18 @@ export default function PosPage() {
               <div style={{ minWidth: 80, textAlign: 'right', fontWeight: 700 }}>{mm(s.brutto)}</div>
             </div>
           ))}
+          {quick.map((q, i) => (
+            <div key={'q' + i} className="ci">
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 600 }}>⚡ {q.name}</div>
+                <div className="muted" style={{ fontSize: 13 }}>Швидкий товар × {q.qty}</div>
+              </div>
+              <button className="qbtn danger" onClick={() => removeQuick(i)} title="Прибрати">×</button>
+              <div style={{ minWidth: 80, textAlign: 'right', fontWeight: 700 }}>{mm(q.brutto * q.qty)}</div>
+            </div>
+          ))}
 
+          {(cart.length > 0 || services.length > 0 || quick.length > 0) && <>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', margin: '8px 0' }}>
             <span style={{ fontSize: 14 }}>Знижка, {currency}:</span>
             <input className="input" type="number" placeholder="0" value={discount} onChange={e => setDiscount(e.target.value)} style={{ maxWidth: 110 }} />
@@ -316,6 +342,7 @@ export default function PosPage() {
             </>
           )}
           <input className="input" placeholder="Примітка" value={note} onChange={e => setNote(e.target.value)} style={{ marginBottom: 12 }} />
+          </>}
 
           <button className="green" style={{ width: '100%' }} disabled={(cart.length === 0 && services.length === 0 && quick.length === 0) || busy} onClick={checkout}>
             {busy ? 'Оформлення…' : `Оформити продаж · ${mm(total)}`}
