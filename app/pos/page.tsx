@@ -18,6 +18,9 @@ export default function PosPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [services, setServices] = useState<ServiceItem[]>([]);
+  const [cats, setCats] = useState<any[]>([]);
+  const [quick, setQuick] = useState<any[]>([]);  // швидкі товари в чеку
+  const [qForm, setQForm] = useState({ name: '', purchase: '', brutto: '', qty: '1', category_id: '' });
   const [svcDesc, setSvcDesc] = useState('');
   const [svcPrice, setSvcPrice] = useState('');
   const [search, setSearch] = useState('');
@@ -38,13 +41,15 @@ export default function PosPage() {
   useEffect(() => { load(); }, [shop]);
 
   async function load() {
-    const [{ data: p }, { data: c }, { data: accs }] = await Promise.all([
+    const [{ data: p }, { data: c }, { data: accs }, { data: cc }] = await Promise.all([
       supabase.from(owner ? 'products' : 'products_safe').select('*,categories(name)').eq('shop', shop).order('name'),
       supabase.from('customers').select('*').eq('shop', shop).order('name'),
       supabase.from('accounts').select('id,name,currency').eq('shop', shop).eq('archived', false).order('created_at'),
+      supabase.from('categories').select('id,name,parent_id').eq('shop', shop).order('name'),
     ]);
     setProducts(p || []); setCustomers(c || []);
     setAccounts(accs || []);
+    setCats(cc || []);
     if ((accs || []).length && !account) setAccount(String(accs![0].id));
     setLoading(false);
   }
@@ -53,19 +58,36 @@ export default function PosPage() {
     setErr(''); setOk('');
     const ex = cart.find(c => c.product.id === p.id);
     if (ex) {
-      if (ex.qty >= p.stock) return setErr(`Більше немає на складі: ${p.name}`);
+      // продаж у мінус дозволено — попередимо, але не блокуємо
+      if (ex.qty >= p.stock && p.stock > 0) setErr(`Увага: ${p.name} — залишок ${p.stock}, продаж у мінус`);
       setCart(cart.map(c => c.product.id === p.id ? { ...c, qty: c.qty + 1 } : c));
     } else {
-      if (p.stock <= 0) return setErr(`Немає на складі: ${p.name}`);
+      if (p.stock <= 0) setErr(`Увага: ${p.name} немає на складі — продаж у мінус`);
       setCart([...cart, { product: p, qty: 1 }]);
     }
   }
 
   function setQty(id: number, qty: number) {
-    const p = products.find(x => x.id === id)!;
     if (qty <= 0) return setCart(cart.filter(c => c.product.id !== id));
-    if (qty > p.stock) { setErr(`Максимум ${p.stock} шт: ${p.name}`); qty = p.stock; }
     setCart(cart.map(c => c.product.id === id ? { ...c, qty } : c));
+  }
+
+  function addQuick() {
+    setErr('');
+    if (!qForm.name.trim()) return setErr('Швидкий товар: вкажіть назву');
+    if (!qForm.brutto || Number(qForm.brutto) <= 0) return setErr('Швидкий товар: вкажіть ціну продажу');
+    setQuick([...quick, {
+      name: qForm.name.trim(),
+      purchase: Number(qForm.purchase) || 0,
+      brutto: Number(qForm.brutto),
+      qty: Number(qForm.qty) || 1,
+      category_id: qForm.category_id || null,
+    }]);
+    setQForm({ name: '', purchase: '', brutto: '', qty: '1', category_id: '' });
+  }
+
+  function removeQuick(i: number) {
+    setQuick(quick.filter((_, idx) => idx !== i));
   }
 
   function addService() {
@@ -94,12 +116,21 @@ export default function PosPage() {
   const taxSvc = netSvc * (hasVat ? 0.08 : 0);
   const profitSvc = netSvc - taxSvc; // собівартість 0
 
-  const netGross = netGoods + netSvc;
-  const grossTotal = bruttoGoods + bruttoSvc;       // брутто до знижки
-  const taxGross = taxGoods + taxSvc;
+  // швидкі товари (брутто = ціна, бо для укр без ПДВ; для rower теж вводять брутто)
+  const bruttoQuick = quick.reduce((a, q) => a + q.brutto * q.qty, 0);
+  const netQuick = quick.reduce((a, q) => a + (hasVat ? q.brutto / 1.23 : q.brutto) * q.qty, 0);
+  const taxQuick = netQuick * (hasVat ? 0.03 : 0);
+  const profitQuick = quick.reduce((a, q) => {
+    const n = (hasVat ? q.brutto / 1.23 : q.brutto) * q.qty;
+    return a + n - q.purchase * q.qty - n * (hasVat ? 0.03 : 0);
+  }, 0);
+
+  const netGross = netGoods + netSvc + netQuick;
+  const grossTotal = bruttoGoods + bruttoSvc + bruttoQuick;       // брутто до знижки
+  const taxGross = taxGoods + taxSvc + taxQuick;
   // комісія каналу (укр): зменшує прибуток
   const feeRate = !hasVat && payment === 'Термінал' ? 0.012 : (!hasVat && payment === 'Сайт' ? 0.02 : 0);
-  const profitGross = profitGoods + profitSvc - (netGoods + netSvc) * feeRate;
+  const profitGross = profitGoods + profitSvc + profitQuick - netGross * feeRate;
 
   // знижка (брутто), коефіцієнт зменшення
   const disc = Math.min(Number(discount) || 0, grossTotal);
@@ -114,7 +145,7 @@ export default function PosPage() {
   const debt = Math.max(0, total - paidNum);
 
   async function checkout() {
-    if (cart.length === 0 && services.length === 0) return;
+    if (cart.length === 0 && services.length === 0 && quick.length === 0) return;
     setBusy(true); setErr(''); setOk('');
     const today = new Date().toISOString().slice(0, 10);
     const pDate = saleDate && saleDate !== today ? `${saleDate}T12:00:00` : null;
@@ -132,11 +163,12 @@ export default function PosPage() {
       p_shop: shop,
       p_pay_channel: channel,
       p_account_id: account ? Number(account) : null,
+      p_quick: quick.map(q => ({ name: q.name, purchase: q.purchase, brutto: q.brutto, qty: q.qty, category_id: q.category_id })),
     });
     setBusy(false);
     if (error) return setErr(error.message);
     setOk(`Продаж оформлено на ${mm(total)}${debt > 0 ? ` · борг ${mm(debt)}` : ''}`);
-    setCart([]); setServices([]); setNote(''); setCustomer('');
+    setCart([]); setServices([]); setQuick([]); setNote(''); setCustomer('');
     setDiscount(''); setPaid(''); setPartial(false);
     setSaleDate(new Date().toISOString().slice(0, 10));
     load();
@@ -178,11 +210,42 @@ export default function PosPage() {
             </div>
             <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>Ціна з ПДВ. Податок з обороту 8%, собівартість 0.</div>
           </div>
+
+          <div className="cart" style={{ marginTop: 16 }}>
+            <h3 style={{ marginTop: 0 }}>Швидкий товар <span className="muted" style={{ fontSize: 12, fontWeight: 400 }}>(якого немає в каталозі)</span></h3>
+            <input className="input" placeholder="Назва товару" value={qForm.name} onChange={e => setQForm({ ...qForm, name: e.target.value })} style={{ marginBottom: 8 }} />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <input className="input" type="number" placeholder="Закупка" value={qForm.purchase} onChange={e => setQForm({ ...qForm, purchase: e.target.value })} />
+              <input className="input" type="number" placeholder="Продаж" value={qForm.brutto} onChange={e => setQForm({ ...qForm, brutto: e.target.value })} />
+              <input className="input" type="number" placeholder="К-сть" value={qForm.qty} onChange={e => setQForm({ ...qForm, qty: e.target.value })} style={{ maxWidth: 80 }} />
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <select value={qForm.category_id} onChange={e => setQForm({ ...qForm, category_id: e.target.value })}>
+                <option value="">— категорія (для бонусу) —</option>
+                {cats.map(c => <option key={c.id} value={c.id}>{c.parent_id ? '↳ ' : ''}{c.name}</option>)}
+              </select>
+              <button className="ghost" onClick={addQuick}>Додати</button>
+            </div>
+            {quick.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                {quick.map((q, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid #eee', fontSize: 14 }}>
+                    <span>{q.name} × {q.qty} <span className="muted">(закуп {q.purchase})</span></span>
+                    <span style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <b>{mm(q.brutto * q.qty)}</b>
+                      <button className="danger" style={{ padding: '2px 8px' }} onClick={() => removeQuick(i)}>×</button>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>Разова продажа без створення товару. Прибуток і бонус — як звичайно.</div>
+          </div>
         </div>
 
         <div className="cart">
           <h3 style={{ marginTop: 0 }}>Чек</h3>
-          {cart.length === 0 && services.length === 0 && <p className="muted">Додайте товари або сервіс зліва</p>}
+          {cart.length === 0 && services.length === 0 && quick.length === 0 && <p className="muted">Додайте товари або сервіс зліва</p>}
           {cart.map(c => (
             <div key={c.product.id} className="ci">
               <div style={{ flex: 1 }}>
@@ -254,7 +317,7 @@ export default function PosPage() {
           )}
           <input className="input" placeholder="Примітка" value={note} onChange={e => setNote(e.target.value)} style={{ marginBottom: 12 }} />
 
-          <button className="green" style={{ width: '100%' }} disabled={(cart.length === 0 && services.length === 0) || busy} onClick={checkout}>
+          <button className="green" style={{ width: '100%' }} disabled={(cart.length === 0 && services.length === 0 && quick.length === 0) || busy} onClick={checkout}>
             {busy ? 'Оформлення…' : `Оформити продаж · ${mm(total)}`}
           </button>
         </div>
