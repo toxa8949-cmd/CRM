@@ -15,7 +15,7 @@ const NAV = [
   { href: '/customers', label: 'Клієнти', icon: '👥', seller: true },
   { href: '/motivation', label: 'Мотивація', icon: '🎯', seller: true },
   { href: '/expenses', label: 'Витрати', icon: '💸', seller: false },
-  { href: '/balance', label: 'Баланс', icon: '💰', seller: false },
+  { href: '/balance', label: 'Баланс', icon: '💰', seller: false, uaOnly: true },
   { href: '/reports', label: 'Звіти', icon: '📈', seller: false },
   { href: '/settings', label: 'Категорії', icon: '⚙️', seller: false },
 ];
@@ -62,8 +62,9 @@ function Inner({ children }: { children: ReactNode }) {
   // (інакше вони встигають зробити запити зі стартовим магазином → плутанина даних)
   if (!shop) return <main className="content" style={{ marginLeft: 0, width: '100%' }}><div className="loading">Завантаження…</div></main>;
 
-  const items = NAV.filter(n => role === 'owner' || n.seller);
   const shopName = SHOPS.find(s => s.slug === shop)?.name || 'Rower Express';
+  const shopHasVat = SHOPS.find(s => s.slug === shop)?.hasVat ?? true;
+  const items = NAV.filter(n => (role === 'owner' || n.seller) && !((n as any).uaOnly && shopHasVat));
 
   async function logout() {
     await supabase.auth.signOut();

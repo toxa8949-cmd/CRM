@@ -193,7 +193,7 @@ export default function PosPage() {
               <div key={p.id} className="pitem" onClick={() => addToCart(p)}>
                 <div>
                   <div style={{ fontWeight: 600 }}>{p.name}</div>
-                  <div className="muted" style={{ fontSize: 13 }}>{p.categories?.name || '—'} · залишок {p.stock} · {p.kind === 'Послуга' ? '8%' : '3%'}</div>
+                  <div className="muted" style={{ fontSize: 13 }}>{p.categories?.name || '—'} · залишок {p.stock}{hasVat ? (p.kind === 'Послуга' ? ' · 8%' : ' · 3%') : ''}</div>
                 </div>
                 <div style={{ fontWeight: 700 }}>{mm(tB(p.price))}</div>
               </div>
@@ -208,7 +208,7 @@ export default function PosPage() {
               <input className="input" type="number" placeholder="Вартість брутто" value={svcPrice} onChange={e => setSvcPrice(e.target.value)} onKeyDown={e => e.key === 'Enter' && addService()} />
               <button className="ghost" onClick={addService}>Додати</button>
             </div>
-            <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>Ціна з ПДВ. Податок з обороту 8%, собівартість 0.</div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 8 }}>{hasVat ? "Ціна з ПДВ. Податок з обороту 8%, собівартість 0." : "Ціна продажу, собівартість 0."}</div>
           </div>
 
           <div className="cart" style={{ marginTop: 16 }}>
@@ -262,7 +262,7 @@ export default function PosPage() {
             <div key={'svc' + i} className="ci">
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 600 }}>🔧 {s.description}</div>
-                <div className="muted" style={{ fontSize: 13 }}>Сервіс · 8%</div>
+                <div className="muted" style={{ fontSize: 13 }}>Сервіс{hasVat ? " · 8%" : ""}</div>
               </div>
               <button className="qbtn danger" onClick={() => removeService(i)} title="Прибрати">×</button>
               <div style={{ minWidth: 80, textAlign: 'right', fontWeight: 700 }}>{mm(s.brutto)}</div>

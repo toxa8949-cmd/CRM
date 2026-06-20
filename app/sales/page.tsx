@@ -168,8 +168,10 @@ export default function SalesPage() {
         'Борг': Math.max(0, s.total - s.paid).toFixed(2),
       };
       if (owner) {
-        base['Нетто'] = Number(s.net).toFixed(2);
-        base['Податок з обороту'] = Number(s.turnover_tax).toFixed(2);
+        if (hasVat) {
+          base['Нетто'] = Number(s.net).toFixed(2);
+          base['Податок з обороту'] = Number(s.turnover_tax).toFixed(2);
+        }
         base['Прибуток'] = Number(s.profit).toFixed(2);
       }
       return base;

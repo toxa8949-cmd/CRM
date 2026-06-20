@@ -13,7 +13,7 @@ type Row = {
 };
 
 export default function IntakePage() {
-  const { slug: shop } = useShop();
+  const { slug: shop, hasVat } = useShop();
   const [rows, setRows] = useState<Row[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
   const [busy, setBusy] = useState(false);
@@ -176,7 +176,7 @@ export default function IntakePage() {
                   <td data-label="К-сть"><input className="input" type="number" style={{ width: 60 }} value={r.qty} onChange={e => upd(i, { qty: Number(e.target.value) })} /></td>
                   <td data-label="Закупка нетто">{money(r.purchase)}</td>
                   <td data-label="Доставка/од.">{r.extra_cost ? money(r.extra_cost) : '—'}</td>
-                  <td data-label="Продаж брутто"><input className="input" type="number" style={{ width: 110 }} placeholder="ціна з ПДВ" value={r.priceBrutto} onChange={e => upd(i, { priceBrutto: e.target.value })} /></td>
+                  <td data-label="Продаж брутто"><input className="input" type="number" style={{ width: 110 }} placeholder={hasVat ? "ціна з ПДВ" : "ціна продажу"} value={r.priceBrutto} onChange={e => upd(i, { priceBrutto: e.target.value })} /></td>
                   <td data-label="Продаж нетто" className="muted">{r.priceBrutto ? money(priceNet) : '—'}</td>
                   <td data-label="Чистий/од." style={{ fontWeight: 600, color: profit > 0 ? '#16a34a' : profit < 0 ? '#dc2626' : '#9ca3af' }}>
                     {r.priceBrutto ? money(profit) : '—'}

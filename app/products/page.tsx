@@ -211,8 +211,8 @@ export default function ProductsPage() {
           <input className="input" type="number" placeholder="Ціна продажу БРУТТО" value={form.priceBrutto} onChange={e => setForm({ ...form, priceBrutto: e.target.value })} />
           <input className="input" type="number" placeholder="Розтрати на од." value={form.extra_cost} onChange={e => setForm({ ...form, extra_cost: e.target.value })} />
           <select value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value })}>
-            <option value="Товар">Товар (3%)</option>
-            <option value="Послуга">Послуга (8%)</option>
+            <option value="Товар">Товар{hasVat ? " (3%)" : ""}</option>
+            <option value="Послуга">Послуга{hasVat ? " (8%)" : ""}</option>
           </select>
           <input className="input" type="number" placeholder="Кількість" value={form.stock} onChange={e => setForm({ ...form, stock: e.target.value })} />
           <button className="green" onClick={add}>Додати</button>
@@ -249,7 +249,7 @@ export default function ProductsPage() {
               <td data-label="Назва">
                 <div style={{ fontWeight: 600 }}>{p.name}</div>
                 <div className="muted" style={{ fontSize: 12 }}>
-                  {p.sku ? p.sku + ' · ' : ''}{p.kind === 'Послуга' ? 'Послуга 8%' : 'Товар 3%'}
+                  {p.sku ? p.sku + ' · ' : ''}{p.kind === 'Послуга' ? (hasVat ? 'Послуга 8%' : 'Послуга') : (hasVat ? 'Товар 3%' : 'Товар')}
                 </div>
               </td>
               <td data-label="Категорія">{p.categories?.name || <span className="muted">—</span>}</td>
