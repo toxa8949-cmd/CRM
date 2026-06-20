@@ -29,6 +29,10 @@ export default function BalancePage() {
   const [trAmount, setTrAmount] = useState('');
   const [trNote, setTrNote] = useState('');
 
+  // UI: вкладка операції + згортання форми рахунку
+  const [opTab, setOpTab] = useState<'move' | 'transfer'>('move');
+  const [showNewAcc, setShowNewAcc] = useState(false);
+
   useEffect(() => { load(); }, [shop]);
 
   async function load() {
@@ -109,95 +113,73 @@ export default function BalancePage() {
   return (
     <>
       <h2>Баланс</h2>
-      <p className="muted">Рахунки та рух коштів. Кожен рахунок — своя валюта.</p>
       {err && <div className="err">{err}</div>}
 
-      {/* Картки рахунків із балансами */}
-      <div className="grid">
-        {accounts.length === 0 && <div className="card"><h3>Немає рахунків</h3><div className="muted">Створіть перший рахунок нижче</div></div>}
+      {/* Картки рахунків — компактні */}
+      <div className="bal-cards">
+        {accounts.length === 0 && <div className="card"><h3>Немає рахунків</h3><div className="muted">Створіть рахунок нижче</div></div>}
         {accounts.map(a => (
-          <div key={a.id} className="card" style={{ position: 'relative', borderLeft: a.is_debt ? '4px solid #d97706' : undefined }}>
-            <h3>{a.name}{a.is_debt && ' (борг)'}</h3>
-            <div className={'value ' + (a.is_debt ? '' : (a.balance >= 0 ? 'green' : 'red'))}
-              style={a.is_debt ? { color: a.balance > 0 ? '#d97706' : '#16a34a' } : undefined}>
+          <div key={a.id} className="bal-card" style={{ borderLeft: a.is_debt ? '4px solid #d97706' : '4px solid #2563eb' }}>
+            <div className="bal-card-top">
+              <span className="bal-card-name">{a.name}{a.is_debt && ' (борг)'}</span>
+              <button className="bal-arch" onClick={() => archiveAccount(a)}>архів</button>
+            </div>
+            <div className="bal-card-sum" style={{ color: a.is_debt ? (a.balance > 0 ? '#d97706' : '#16a34a') : (a.balance >= 0 ? '#16a34a' : '#dc2626') }}>
               {money(a.balance, a.currency)}
             </div>
-            {a.is_debt && <span className="muted" style={{ fontSize: 12 }}>{a.balance > 0 ? 'треба віддати' : 'розраховано'}</span>}
-            <button className="ghost" style={{ position: 'absolute', top: 12, right: 12, padding: '4px 8px', fontSize: 12 }}
-              onClick={() => archiveAccount(a)}>архів</button>
+            {a.is_debt && <span className="muted" style={{ fontSize: 11 }}>{a.balance > 0 ? 'треба віддати' : 'розраховано'}</span>}
           </div>
         ))}
       </div>
 
-      {/* Додати рахунок */}
-      <h3 style={{ marginTop: 24 }}>Новий рахунок</h3>
-      <div className="form" style={{ gridTemplateColumns: '2fr 1fr auto' }}>
-        <input className="input" placeholder="Назва (Готівка, Долари, ПриватБанк…)" value={accName} onChange={e => setAccName(e.target.value)} />
-        <select value={accCur} onChange={e => setAccCur(e.target.value)}>
-          <option value="₴">₴ гривня</option>
-          <option value="$">$ долар</option>
-          <option value="€">€ євро</option>
-          <option value="zł">zł злотий</option>
-        </select>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-          <input type="checkbox" checked={accDebt} onChange={e => setAccDebt(e.target.checked)} style={{ width: 'auto' }} />
-          Рахунок-борг (скільки винен)
-        </label>
-        <button onClick={addAccount}>Додати рахунок</button>
-      </div>
-
-      {/* Рух коштів вручну */}
+      {/* Операції: вкладки Рух / Переказ в одному блоці */}
       {accounts.length > 0 && (
-        <>
-          <h3 style={{ marginTop: 8 }}>Рух коштів</h3>
-          <div className="form" style={{ gridTemplateColumns: '1.5fr 1fr 1fr 2fr auto' }}>
-            <select value={mvAcc} onChange={e => setMvAcc(e.target.value)}>
-              <option value="">— рахунок —</option>
-              {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
-            </select>
-            <select value={mvType} onChange={e => setMvType(e.target.value as any)}>
-              {mvAccIsDebt ? (
-                <>
-                  <option value="in">↑ Збільшити борг</option>
-                  <option value="out">↓ Погасити борг</option>
-                </>
-              ) : (
-                <>
-                  <option value="in">↑ Надходження</option>
-                  <option value="out">↓ Витрата</option>
-                </>
-              )}
-            </select>
-            <input className="input" type="number" placeholder="Сума" value={mvAmount} onChange={e => setMvAmount(e.target.value)} />
-            <input className="input" placeholder="Опис (за що / звідки)" value={mvNote} onChange={e => setMvNote(e.target.value)} />
-            <button className={mvType === 'in' ? 'green' : 'danger'} onClick={addMove}>Додати</button>
+        <div className="bal-ops">
+          <div className="bal-tabs">
+            <button className={opTab === 'move' ? 'on' : ''} onClick={() => setOpTab('move')}>Рух коштів</button>
+            {accounts.length > 1 && <button className={opTab === 'transfer' ? 'on' : ''} onClick={() => setOpTab('transfer')}>Переказ</button>}
           </div>
-        </>
-      )}
 
-      {/* Переказ між рахунками (для погашення боргу, обміну валют) */}
-      {accounts.length > 1 && (
-        <>
-          <h3 style={{ marginTop: 8 }}>Переказ між рахунками</h3>
-          <p className="muted" style={{ marginTop: -8, fontSize: 13 }}>Напр. погасити борг: з «Готівка» → на «Борг Сергію». З першого виходить, на другий заходить.</p>
-          <div className="form" style={{ gridTemplateColumns: '1.5fr 1.5fr 1fr 1.5fr auto' }}>
-            <select value={trFrom} onChange={e => setTrFrom(e.target.value)}>
-              <option value="">— звідки —</option>
-              {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
-            </select>
-            <select value={trTo} onChange={e => setTrTo(e.target.value)}>
-              <option value="">— куди —</option>
-              {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
-            </select>
-            <input className="input" type="number" placeholder="Сума" value={trAmount} onChange={e => setTrAmount(e.target.value)} />
-            <input className="input" placeholder="Опис (напр. віддав Сергію)" value={trNote} onChange={e => setTrNote(e.target.value)} />
-            <button onClick={doTransfer}>Переказати</button>
-          </div>
-        </>
+          {opTab === 'move' && (
+            <div className="bal-op-form">
+              <select value={mvAcc} onChange={e => setMvAcc(e.target.value)}>
+                <option value="">— рахунок —</option>
+                {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
+              </select>
+              <select value={mvType} onChange={e => setMvType(e.target.value as any)}>
+                {mvAccIsDebt
+                  ? <>{<option value="in">↑ Збільшити борг</option>}<option value="out">↓ Погасити борг</option></>
+                  : <>{<option value="in">↑ Надходження</option>}<option value="out">↓ Витрата</option></>}
+              </select>
+              <input className="input" type="number" placeholder="Сума" value={mvAmount} onChange={e => setMvAmount(e.target.value)} />
+              <input className="input" placeholder="Опис" value={mvNote} onChange={e => setMvNote(e.target.value)} />
+              <button className={mvType === 'in' ? 'green' : 'danger'} onClick={addMove}>Додати</button>
+            </div>
+          )}
+
+          {opTab === 'transfer' && (
+            <>
+              <div className="bal-op-form">
+                <select value={trFrom} onChange={e => setTrFrom(e.target.value)}>
+                  <option value="">— звідки —</option>
+                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
+                </select>
+                <select value={trTo} onChange={e => setTrTo(e.target.value)}>
+                  <option value="">— куди —</option>
+                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
+                </select>
+                <input className="input" type="number" placeholder="Сума" value={trAmount} onChange={e => setTrAmount(e.target.value)} />
+                <input className="input" placeholder="Опис (напр. віддав Сергію)" value={trNote} onChange={e => setTrNote(e.target.value)} />
+                <button onClick={doTransfer}>Переказати</button>
+              </div>
+              <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>Погасити борг: з «Готівка» → на «Борг Сергію». З першого виходить, на другий заходить.</p>
+            </>
+          )}
+        </div>
       )}
 
       {/* Історія рухів */}
-      <h3 style={{ marginTop: 8 }}>Останні рухи</h3>
+      <h3 style={{ marginTop: 20 }}>Останні рухи</h3>
       <table>
         <thead><tr><th>Дата</th><th>Рахунок</th><th>Сума</th><th>Тип</th><th>Опис</th><th></th></tr></thead>
         <tbody>
@@ -223,6 +205,29 @@ export default function BalancePage() {
           ))}
         </tbody>
       </table>
+
+      {/* Новий рахунок — згорнуто внизу (рідкісна дія) */}
+      <div style={{ marginTop: 24 }}>
+        <button className="ghost" onClick={() => setShowNewAcc(!showNewAcc)}>
+          {showNewAcc ? '× Сховати' : '+ Новий рахунок'}
+        </button>
+        {showNewAcc && (
+          <div className="bal-op-form" style={{ marginTop: 10 }}>
+            <input className="input" placeholder="Назва (Готівка, Долари, ПриватБанк…)" value={accName} onChange={e => setAccName(e.target.value)} />
+            <select value={accCur} onChange={e => setAccCur(e.target.value)}>
+              <option value="₴">₴ гривня</option>
+              <option value="$">$ долар</option>
+              <option value="€">€ євро</option>
+              <option value="zł">zł злотий</option>
+            </select>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, whiteSpace: 'nowrap' }}>
+              <input type="checkbox" checked={accDebt} onChange={e => setAccDebt(e.target.checked)} style={{ width: 'auto' }} />
+              Рахунок-борг
+            </label>
+            <button onClick={addAccount}>Додати</button>
+          </div>
+        )}
+      </div>
     </>
   );
 }

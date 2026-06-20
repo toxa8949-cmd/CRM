@@ -158,3 +158,22 @@ a.link{color:#2563eb;cursor:pointer}
 .stock-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid #f1f5f9;font-size:15px}
 .stock-row:last-child{border-bottom:0}
 .stock-row span{color:#6b7280}
+
+/* === Баланс: компактний вигляд === */
+.bal-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px}
+.bal-card{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.bal-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.bal-card-name{font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.02em}
+.bal-card-sum{font-size:26px;font-weight:700;line-height:1.1}
+.bal-arch{background:none;border:none;color:#9ca3af;font-size:11px;cursor:pointer;padding:2px 6px;border-radius:6px}
+.bal-arch:hover{background:#f3f4f6;color:#6b7280}
+.bal-ops{background:#fff;border-radius:12px;padding:14px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:8px}
+.bal-tabs{display:flex;gap:8px;margin-bottom:12px}
+.bal-tabs button{background:#f3f4f6;border:none;padding:7px 16px;border-radius:8px;font-size:14px;font-weight:600;color:#6b7280;cursor:pointer}
+.bal-tabs button.on{background:#2563eb;color:#fff}
+.bal-op-form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.bal-op-form select,.bal-op-form .input{flex:1;min-width:120px}
+.bal-op-form button{white-space:nowrap}
+@media(max-width:640px){
+  .bal-op-form select,.bal-op-form .input,.bal-op-form button{flex:1 1 100%}
+}
