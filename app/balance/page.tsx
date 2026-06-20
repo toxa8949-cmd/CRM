@@ -20,6 +20,15 @@ export default function BalancePage() {
   const [mvAmount, setMvAmount] = useState('');
   const [mvNote, setMvNote] = useState('');
 
+  // прапор "це рахунок-борг" при створенні
+  const [accDebt, setAccDebt] = useState(false);
+
+  // переказ між рахунками
+  const [trFrom, setTrFrom] = useState('');
+  const [trTo, setTrTo] = useState('');
+  const [trAmount, setTrAmount] = useState('');
+  const [trNote, setTrNote] = useState('');
+
   useEffect(() => { load(); }, [shop]);
 
   async function load() {
@@ -43,10 +52,24 @@ export default function BalancePage() {
     setErr('');
     if (!accName.trim()) return setErr('Вкажіть назву рахунку');
     const { error } = await supabase.from('accounts').insert({
-      shop, name: accName.trim(), currency: accCur.trim() || '₴',
+      shop, name: accName.trim(), currency: accCur.trim() || '₴', is_debt: accDebt,
     });
     if (error) return setErr(error.message);
-    setAccName(''); setAccCur('₴'); load();
+    setAccName(''); setAccCur('₴'); setAccDebt(false); load();
+  }
+
+  async function doTransfer() {
+    setErr('');
+    if (!trFrom || !trTo) return setErr('Оберіть обидва рахунки');
+    if (trFrom === trTo) return setErr('Рахунки мають бути різні');
+    const amt = Number(trAmount);
+    if (!amt || amt <= 0) return setErr('Вкажіть суму');
+    const { error } = await supabase.rpc('transfer_funds', {
+      p_from: Number(trFrom), p_to: Number(trTo), p_amount: amt,
+      p_shop: shop, p_note: trNote.trim() || null,
+    });
+    if (error) return setErr(error.message);
+    setTrAmount(''); setTrNote(''); load();
   }
 
   async function archiveAccount(a: any) {
@@ -89,9 +112,13 @@ export default function BalancePage() {
       <div className="grid">
         {accounts.length === 0 && <div className="card"><h3>Немає рахунків</h3><div className="muted">Створіть перший рахунок нижче</div></div>}
         {accounts.map(a => (
-          <div key={a.id} className="card" style={{ position: 'relative' }}>
-            <h3>{a.name}</h3>
-            <div className={'value ' + (a.balance >= 0 ? 'green' : 'red')}>{money(a.balance, a.currency)}</div>
+          <div key={a.id} className="card" style={{ position: 'relative', borderLeft: a.is_debt ? '4px solid #d97706' : undefined }}>
+            <h3>{a.name}{a.is_debt && ' (борг)'}</h3>
+            <div className={'value ' + (a.is_debt ? '' : (a.balance >= 0 ? 'green' : 'red'))}
+              style={a.is_debt ? { color: a.balance > 0 ? '#d97706' : '#16a34a' } : undefined}>
+              {money(a.balance, a.currency)}
+            </div>
+            {a.is_debt && <span className="muted" style={{ fontSize: 12 }}>{a.balance > 0 ? 'треба віддати' : 'розраховано'}</span>}
             <button className="ghost" style={{ position: 'absolute', top: 12, right: 12, padding: '4px 8px', fontSize: 12 }}
               onClick={() => archiveAccount(a)}>архів</button>
           </div>
@@ -108,6 +135,10 @@ export default function BalancePage() {
           <option value="€">€ євро</option>
           <option value="zł">zł злотий</option>
         </select>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <input type="checkbox" checked={accDebt} onChange={e => setAccDebt(e.target.checked)} style={{ width: 'auto' }} />
+          Рахунок-борг (скільки винен)
+        </label>
         <button onClick={addAccount}>Додати рахунок</button>
       </div>
 
@@ -131,6 +162,27 @@ export default function BalancePage() {
         </>
       )}
 
+      {/* Переказ між рахунками (для погашення боргу, обміну валют) */}
+      {accounts.length > 1 && (
+        <>
+          <h3 style={{ marginTop: 8 }}>Переказ між рахунками</h3>
+          <p className="muted" style={{ marginTop: -8, fontSize: 13 }}>Напр. погасити борг: з «Готівка» → на «Борг Сергію». З першого виходить, на другий заходить.</p>
+          <div className="form" style={{ gridTemplateColumns: '1.5fr 1.5fr 1fr 1.5fr auto' }}>
+            <select value={trFrom} onChange={e => setTrFrom(e.target.value)}>
+              <option value="">— звідки —</option>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
+            </select>
+            <select value={trTo} onChange={e => setTrTo(e.target.value)}>
+              <option value="">— куди —</option>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
+            </select>
+            <input className="input" type="number" placeholder="Сума" value={trAmount} onChange={e => setTrAmount(e.target.value)} />
+            <input className="input" placeholder="Опис (напр. віддав Сергію)" value={trNote} onChange={e => setTrNote(e.target.value)} />
+            <button onClick={doTransfer}>Переказати</button>
+          </div>
+        </>
+      )}
+
       {/* Історія рухів */}
       <h3 style={{ marginTop: 8 }}>Останні рухи</h3>
       <table>
@@ -147,6 +199,7 @@ export default function BalancePage() {
               <td data-label="Тип">
                 {m.kind === 'sale' ? <span className="badge ok">Продаж</span>
                   : m.kind === 'expense' ? <span className="badge out">Витрата</span>
+                  : (m.kind === 'transfer_in' || m.kind === 'transfer_out') ? <span className="tag">Переказ</span>
                   : <span className="tag">Вручну</span>}
               </td>
               <td data-label="Опис">{m.note || '—'}</td>
