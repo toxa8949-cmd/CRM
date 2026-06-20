@@ -20,14 +20,17 @@ export default function ReportsPage() {
       supabase.from('sales').select('total,net,turnover_tax,profit,created_at,status').eq('shop', shop).gte('created_at', from).lte('created_at', toEnd),
       supabase.from('sale_items').select('product_name,qty,price,purchase,extra_cost,tax_rate,sale_id,sales!inner(created_at,status)')
         .eq('shop', shop).gte('sales.created_at', from).lte('sales.created_at', toEnd),
-      supabase.from('expenses').select('category,amount,spent_at').eq('shop', shop).gte('spent_at', from).lte('spent_at', to),
+      supabase.from('expenses').select('category,amount,spent_at,is_goods').eq('shop', shop).gte('spent_at', from).lte('spent_at', to),
     ]);
 
     const valid = (sales || []).filter(s => s.status !== 'Повернення');
     const revenue = valid.reduce((a, s) => a + Number(s.total), 0);      // брутто
     const revenueNet = valid.reduce((a, s) => a + Number(s.net), 0);     // нетто
     const grossProfit = valid.reduce((a, s) => a + Number(s.profit), 0); // вже з вирах. податком з обороту
-    const expenseTotal = (expenses || []).reduce((a, e) => a + Number(e.amount), 0);
+    // тільки НЕ-товарні витрати віднімаються від прибутку
+    // (закупівля товару вже врахована в прибутку → is_goods виключаємо)
+    const realExpenses = (expenses || []).filter((e: any) => !e.is_goods);
+    const expenseTotal = realExpenses.reduce((a, e) => a + Number(e.amount), 0);
     const tax = valid.reduce((a, s) => a + Number(s.turnover_tax), 0);   // реальний податок з обороту
     const net = grossProfit - expenseTotal;                             // чистий результат
 
@@ -43,7 +46,7 @@ export default function ReportsPage() {
 
     // витрати по категоріях
     const eMap: Record<string, number> = {};
-    (expenses || []).forEach(e => { eMap[e.category] = (eMap[e.category] || 0) + Number(e.amount); });
+    realExpenses.forEach(e => { eMap[e.category] = (eMap[e.category] || 0) + Number(e.amount); });
     const byCat = Object.entries(eMap).map(([category, amount]) => ({ category, amount })).sort((a, b) => b.amount - a.amount);
 
     // по днях

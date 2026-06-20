@@ -70,8 +70,8 @@ export default function BalancePage() {
   }
 
   async function delMove(id: number) {
-    if (!confirm('Видалити цей рух коштів?')) return;
-    await supabase.from('account_moves').delete().eq('id', id);
+    if (!confirm('Видалити цей рух коштів? Якщо це витрата — вона теж зникне.')) return;
+    await supabase.rpc('delete_account_move', { p_move_id: id });
     load();
   }
 
@@ -151,7 +151,7 @@ export default function BalancePage() {
               </td>
               <td data-label="Опис">{m.note || '—'}</td>
               <td className="actions" data-label="Дії"><div className="cell-actions">
-                {m.kind === 'manual' && <button className="danger" onClick={() => delMove(m.id)}>🗑</button>}
+                {m.kind !== 'sale' && <button className="danger" onClick={() => delMove(m.id)}>🗑</button>}
               </div></td>
             </tr>
           ))}

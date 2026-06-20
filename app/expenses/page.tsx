@@ -14,6 +14,7 @@ export default function ExpensesPage() {
   const [form, setForm] = useState({ category: 'Реклама', amount: '', description: '', spent_at: todayISO() });
   const [accounts, setAccounts] = useState<any[]>([]);
   const [accId, setAccId] = useState('');
+  const [isGoods, setIsGoods] = useState(false);
   const [edit, setEdit] = useState<Expense | null>(null);
 
   useEffect(() => { load(); }, [shop]);
@@ -37,22 +38,26 @@ export default function ExpensesPage() {
       category: form.category, amount: Number(form.amount),
       description: form.description || null, spent_at: form.spent_at,
       account_id: accId ? Number(accId) : null,
+      is_goods: isGoods,
     }).select('id').single();
     if (error) return setErr(error.message);
     // рух коштів: витрата з обраного рахунку
     if (accId && exp) {
       await supabase.from('account_moves').insert({
         shop, account_id: Number(accId), amount: -Number(form.amount), kind: 'expense',
-        note: `${form.category}${form.description ? ' — ' + form.description : ''}`,
+        note: `${isGoods ? 'Закупівля товару' : form.category}${form.description ? ' — ' + form.description : ''}`,
         ref_expense_id: exp.id, created_at: form.spent_at,
       });
     }
-    setForm({ category: 'Реклама', amount: '', description: '', spent_at: todayISO() }); load();
+    setForm({ category: 'Реклама', amount: '', description: '', spent_at: todayISO() });
+    setIsGoods(false);
+    load();
   }
 
   async function del(e: Expense) {
-    if (!confirm('Видалити витрату?')) return;
-    await supabase.from('expenses').delete().eq('id', e.id); load();
+    if (!confirm('Видалити витрату? Повʼязаний рух коштів теж зникне.')) return;
+    await supabase.rpc('delete_expense', { p_expense_id: e.id });
+    load();
   }
 
   async function saveEdit() {
@@ -94,6 +99,10 @@ export default function ExpensesPage() {
             {accounts.map(a => <option key={a.id} value={a.id}>З: {a.name} ({a.currency})</option>)}
           </select>
         )}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, gridColumn: '1/-1' }}>
+          <input type="checkbox" checked={isGoods} onChange={e => setIsGoods(e.target.checked)} style={{ width: 'auto' }} />
+          Це закупівля товару (не віднімати від прибутку — вже враховано)
+        </label>
         <button onClick={add}>Додати витрату</button>
       </div>
 
@@ -123,7 +132,7 @@ export default function ExpensesPage() {
           ) : (
             <tr key={e.id}>
               <td data-label="Дата">{e.spent_at}</td>
-              <td data-label="Категорія"><span className="tag">{e.category}</span></td>
+              <td data-label="Категорія"><span className="tag">{e.category}</span>{(e as any).is_goods && <span className="badge low" style={{ marginLeft: 6 }}>товар</span>}</td>
               <td data-label="Сума" style={{ color: '#dc2626' }}>{mm(e.amount)}</td>
               <td data-label="Опис">{e.description || '—'}</td>
               <td className="actions" data-label="Дії"><div className="cell-actions">
