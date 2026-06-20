@@ -84,9 +84,12 @@ export default function BalancePage() {
     const amt = Number(mvAmount);
     if (!amt || amt <= 0) return setErr('Вкажіть суму');
     const signed = mvType === 'in' ? amt : -amt;
+    const defNote = mvAccIsDebt
+      ? (mvType === 'in' ? 'Збільшення боргу' : 'Погашення боргу')
+      : (mvType === 'in' ? 'Надходження' : 'Витрата');
     const { error } = await supabase.from('account_moves').insert({
       shop, account_id: Number(mvAcc), amount: signed, kind: 'manual',
-      note: mvNote.trim() || (mvType === 'in' ? 'Надходження' : 'Витрата'),
+      note: mvNote.trim() || defNote,
     });
     if (error) return setErr(error.message);
     setMvAmount(''); setMvNote(''); load();
@@ -99,6 +102,7 @@ export default function BalancePage() {
   }
 
   const curOf = (id: number) => accounts.find(a => a.id === id)?.currency || '₴';
+  const mvAccIsDebt = !!accounts.find(a => String(a.id) === mvAcc)?.is_debt;
 
   if (loading) return <div className="loading">Завантаження…</div>;
 
@@ -152,8 +156,17 @@ export default function BalancePage() {
               {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
             </select>
             <select value={mvType} onChange={e => setMvType(e.target.value as any)}>
-              <option value="in">↑ Надходження</option>
-              <option value="out">↓ Витрата</option>
+              {mvAccIsDebt ? (
+                <>
+                  <option value="in">↑ Збільшити борг</option>
+                  <option value="out">↓ Погасити борг</option>
+                </>
+              ) : (
+                <>
+                  <option value="in">↑ Надходження</option>
+                  <option value="out">↓ Витрата</option>
+                </>
+              )}
             </select>
             <input className="input" type="number" placeholder="Сума" value={mvAmount} onChange={e => setMvAmount(e.target.value)} />
             <input className="input" placeholder="Опис (за що / звідки)" value={mvNote} onChange={e => setMvNote(e.target.value)} />
