@@ -4,8 +4,9 @@ import { supabase, type Category } from '../../lib/supabase';
 import { useShop } from '../../lib/shop';
 
 export default function SettingsPage() {
-  const { slug: shop } = useShop();
+  const { slug: shop, hasVat } = useShop();
   const [cats, setCats] = useState<any[]>([]);
+  const [accounts, setAccounts] = useState<any[]>([]);
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState('');
   const [err, setErr] = useState('');
@@ -15,9 +16,18 @@ export default function SettingsPage() {
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase.from('categories').select('*,products(id)').eq('shop', shop).order('name');
+    const [{ data }, { data: accs }] = await Promise.all([
+      supabase.from('categories').select('*,products(id)').eq('shop', shop).order('name'),
+      supabase.from('accounts').select('id,name,currency').eq('shop', shop).eq('archived', false).order('created_at'),
+    ]);
     setCats((data || []).map((c: any) => ({ ...c, count: c.products?.length || 0 })));
+    setAccounts(accs || []);
     setLoading(false);
+  }
+
+  async function setConsignment(c: any, accId: string) {
+    await supabase.from('categories').update({ consignment_account_id: accId ? Number(accId) : null }).eq('id', c.id);
+    load();
   }
 
   async function add() {
@@ -72,7 +82,7 @@ export default function SettingsPage() {
       </div>
 
       <table>
-        <thead><tr><th>Категорія</th><th>Товарів</th><th>Аксесуар (бонус 5%)</th><th></th></tr></thead>
+        <thead><tr><th>Категорія</th><th>Товарів</th><th>Аксесуар (бонус 5%)</th>{!hasVat && accounts.length > 0 && <th>Товар партнера</th>}<th></th></tr></thead>
         <tbody>
           {ordered.length === 0 && <tr><td colSpan={4} className="muted">Немає категорій</td></tr>}
           {ordered.map(c => (
@@ -88,6 +98,14 @@ export default function SettingsPage() {
                   {c.is_accessory ? '✓ Так' : 'Ні'}
                 </button>
               </td>
+              {!hasVat && accounts.length > 0 && (
+                <td data-label="Товар партнера">
+                  <select value={c.consignment_account_id || ''} onChange={e => setConsignment(c, e.target.value)} style={{ minWidth: 150 }}>
+                    <option value="">— ні —</option>
+                    {accounts.map(a => <option key={a.id} value={a.id}>Собівартість → {a.name}</option>)}
+                  </select>
+                </td>
+              )}
               <td className="actions" data-label="Дії"><div className="cell-actions"><button className="danger" onClick={() => del(c)}>🗑</button></div></td>
             </tr>
           ))}
