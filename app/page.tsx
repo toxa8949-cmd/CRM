@@ -57,10 +57,11 @@ export default function Dashboard() {
       monthTax: monthS.reduce((a, x) => a + Number(x.turnover_tax || 0), 0),
       monthCount: monthS.length,
       stockValue: p.reduce((a, x) => a + x.stock * Number(x.purchase), 0),
-      stockRetail: p.reduce((a, x) => a + x.stock * brutto(Number(x.price)), 0),
+      stockRetail: p.reduce((a, x) => a + x.stock * (hasVat ? brutto(Number(x.price)) : Number(x.price)), 0),
       stockProfit: p.reduce((a, x) => {
         const priceNet = Number(x.price);
-        const unitProfit = priceNet - Number(x.purchase) - Number(x.extra_cost || 0) - priceNet * taxRate(x.kind) / 100;
+        const tax = hasVat ? priceNet * taxRate(x.kind) / 100 : 0;
+        const unitProfit = priceNet - Number(x.purchase) - Number(x.extra_cost || 0) - tax;
         return a + x.stock * unitProfit;
       }, 0),
       lowStock: low.length,
