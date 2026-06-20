@@ -7,7 +7,7 @@ import { useShop } from '../lib/shop';
 
 export default function Dashboard() {
   const { role, ready } = useAuth();
-  const { slug: shop, currency, hasVat } = useShop();
+  const { slug: shop, currency, hasVat, partnerShare } = useShop();
   const mm = (v: number) => money(v, currency);
   const owner = role === 'owner';
   const [loading, setLoading] = useState(true);
@@ -110,7 +110,15 @@ export default function Dashboard() {
             <span>Прибуток за місяць</span>
             <b style={{ color: '#16a34a' }}>{mm(stat.monthProfit)}</b>
           </div>}
-          {owner && <div className="hero-mini">
+          {owner && partnerShare > 0 && <div className="hero-mini">
+            <span>Моя частка ({100 - partnerShare}%)</span>
+            <b style={{ color: '#16a34a' }}>{mm(stat.monthProfit * (100 - partnerShare) / 100)}</b>
+          </div>}
+          {owner && partnerShare > 0 && <div className="hero-mini">
+            <span>Частка магазину ({partnerShare}%)</span>
+            <b style={{ color: '#d97706' }}>{mm(stat.monthProfit * partnerShare / 100)}</b>
+          </div>}
+          {owner && hasVat && <div className="hero-mini">
             <span>Податок з обороту (міс.)</span>
             <b>{mm(stat.monthTax)}</b>
           </div>}

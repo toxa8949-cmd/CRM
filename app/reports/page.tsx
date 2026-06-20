@@ -4,7 +4,7 @@ import { supabase, money, todayISO } from '../../lib/supabase';
 import { useShop } from '../../lib/shop';
 
 export default function ReportsPage() {
-  const { slug: shop, currency, hasVat } = useShop();
+  const { slug: shop, currency, hasVat, partnerShare } = useShop();
   const m = (v: number) => money(v, currency);
   const [from, setFrom] = useState(todayISO().slice(0, 8) + '01');
   const [to, setTo] = useState(todayISO());
@@ -88,6 +88,21 @@ export default function ReportsPage() {
             {hasVat && <div className="card"><h3>Податок з обороту</h3><div className="value">{m(data.tax)}</div><span className="muted">3% товар / 8% послуга</span></div>}
             <div className="card"><h3>Результат (− витрати)</h3><div className={'value ' + (data.net >= 0 ? 'green' : 'red')}>{m(data.net)}</div></div>
           </div>
+
+          {partnerShare > 0 && (
+            <div className="grid" style={{ marginTop: 4 }}>
+              <div className="card" style={{ borderLeft: '4px solid #16a34a' }}>
+                <h3>Моя частка ({100 - partnerShare}%)</h3>
+                <div className="value green">{m(data.grossProfit * (100 - partnerShare) / 100)}</div>
+                <span className="muted">з повного прибутку {m(data.grossProfit)}</span>
+              </div>
+              <div className="card" style={{ borderLeft: '4px solid #d97706' }}>
+                <h3>Частка магазину ({partnerShare}%)</h3>
+                <div className="value" style={{ color: '#d97706' }}>{m(data.grossProfit * partnerShare / 100)}</div>
+                <span className="muted">комісія магазину</span>
+              </div>
+            </div>
+          )}
 
           <h3>Продажі по днях</h3>
           <div className="card" style={{ marginBottom: 24 }}>

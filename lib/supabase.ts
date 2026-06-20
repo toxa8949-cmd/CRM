@@ -10,9 +10,9 @@ export const money = (v: number, currency = 'zł') =>
 
 // магазини: маршрут → slug
 export const SHOPS = [
-  { slug: 'rower', path: '/', name: 'Rower Express', currency: 'zł', hasVat: true },
-  { slug: 'dobrobud', path: '/dobrobud', name: 'Добробуд', currency: '₴', hasVat: false },
-  { slug: 'velokrai', path: '/velokrai', name: 'Велокрай', currency: '₴', hasVat: false },
+  { slug: 'rower', path: '/', name: 'Rower Express', currency: 'zł', hasVat: true, partnerShare: 0 },
+  { slug: 'dobrobud', path: '/dobrobud', name: 'Добробуд', currency: '₴', hasVat: false, partnerShare: 50 },
+  { slug: 'velokrai', path: '/velokrai', name: 'Велокрай', currency: '₴', hasVat: false, partnerShare: 0 },
 ];
 export const shopBySlug = (slug: string) => SHOPS.find(s => s.slug === slug) || SHOPS[0];
 
