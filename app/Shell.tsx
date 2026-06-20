@@ -15,6 +15,7 @@ const NAV = [
   { href: '/customers', label: 'Клієнти', icon: '👥', seller: true },
   { href: '/motivation', label: 'Мотивація', icon: '🎯', seller: true },
   { href: '/expenses', label: 'Витрати', icon: '💸', seller: false },
+  { href: '/balance', label: 'Баланс', icon: '💰', seller: false },
   { href: '/reports', label: 'Звіти', icon: '📈', seller: false },
   { href: '/settings', label: 'Категорії', icon: '⚙️', seller: false },
 ];

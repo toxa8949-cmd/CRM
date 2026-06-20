@@ -28,6 +28,8 @@ export default function PosPage() {
   const [paid, setPaid] = useState('');
   const [partial, setPartial] = useState(false);
   const [saleDate, setSaleDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [account, setAccount] = useState('');
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
   const [busy, setBusy] = useState(false);
@@ -36,11 +38,15 @@ export default function PosPage() {
   useEffect(() => { load(); }, [shop]);
 
   async function load() {
-    const [{ data: p }, { data: c }] = await Promise.all([
+    const [{ data: p }, { data: c }, { data: accs }] = await Promise.all([
       supabase.from(owner ? 'products' : 'products_safe').select('*,categories(name)').eq('shop', shop).order('name'),
-      supabase.from('customers').select('*').order('name'),
+      supabase.from('customers').select('*').eq('shop', shop).order('name'),
+      supabase.from('accounts').select('id,name,currency').eq('shop', shop).eq('archived', false).order('created_at'),
     ]);
-    setProducts(p || []); setCustomers(c || []); setLoading(false);
+    setProducts(p || []); setCustomers(c || []);
+    setAccounts(accs || []);
+    if ((accs || []).length && !account) setAccount(String(accs![0].id));
+    setLoading(false);
   }
 
   function addToCart(p: Product) {
@@ -125,6 +131,7 @@ export default function PosPage() {
       p_date: pDate,
       p_shop: shop,
       p_pay_channel: channel,
+      p_account_id: account ? Number(account) : null,
     });
     setBusy(false);
     if (error) return setErr(error.message);
@@ -237,6 +244,14 @@ export default function PosPage() {
             <option>Готівка</option><option>Картка</option><option>Переказ</option><option>Накладений платіж</option>
             {!hasVat && <><option>Термінал</option><option>Сайт</option></>}
           </select>
+          {accounts.length > 0 && (
+            <>
+              <label className="muted" style={{ fontSize: 13, display: 'block', marginBottom: 4 }}>Гроші на рахунок</label>
+              <select value={account} onChange={e => setAccount(e.target.value)} style={{ marginBottom: 10 }}>
+                {accounts.map(a => <option key={a.id} value={a.id}>{a.name} ({a.currency})</option>)}
+              </select>
+            </>
+          )}
           <input className="input" placeholder="Примітка" value={note} onChange={e => setNote(e.target.value)} style={{ marginBottom: 12 }} />
 
           <button className="green" style={{ width: '100%' }} disabled={(cart.length === 0 && services.length === 0) || busy} onClick={checkout}>

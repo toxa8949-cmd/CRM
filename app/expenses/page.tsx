@@ -12,25 +12,41 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState('');
   const [form, setForm] = useState({ category: 'Реклама', amount: '', description: '', spent_at: todayISO() });
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [accId, setAccId] = useState('');
   const [edit, setEdit] = useState<Expense | null>(null);
 
   useEffect(() => { load(); }, [shop]);
 
   async function load() {
     setLoading(true);
-    const { data } = await supabase.from('expenses').select('*').eq('shop', shop).order('spent_at', { ascending: false }).limit(300);
-    setList(data || []); setLoading(false);
+    const [{ data }, { data: accs }] = await Promise.all([
+      supabase.from('expenses').select('*').eq('shop', shop).order('spent_at', { ascending: false }).limit(300),
+      supabase.from('accounts').select('id,name,currency').eq('shop', shop).eq('archived', false).order('created_at'),
+    ]);
+    setList(data || []); setAccounts(accs || []);
+    if ((accs || []).length && !accId) setAccId(String(accs![0].id));
+    setLoading(false);
   }
 
   async function add() {
     setErr('');
     if (!form.amount) return setErr('Вкажіть суму');
-    const { error } = await supabase.from('expenses').insert({
+    const { data: exp, error } = await supabase.from('expenses').insert({
       shop,
       category: form.category, amount: Number(form.amount),
       description: form.description || null, spent_at: form.spent_at,
-    });
+      account_id: accId ? Number(accId) : null,
+    }).select('id').single();
     if (error) return setErr(error.message);
+    // рух коштів: витрата з обраного рахунку
+    if (accId && exp) {
+      await supabase.from('account_moves').insert({
+        shop, account_id: Number(accId), amount: -Number(form.amount), kind: 'expense',
+        note: `${form.category}${form.description ? ' — ' + form.description : ''}`,
+        ref_expense_id: exp.id, created_at: form.spent_at,
+      });
+    }
     setForm({ category: 'Реклама', amount: '', description: '', spent_at: todayISO() }); load();
   }
 
@@ -72,6 +88,12 @@ export default function ExpensesPage() {
         <input className="input" type="number" placeholder="Сума" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} />
         <input className="input" type="date" value={form.spent_at} onChange={e => setForm({ ...form, spent_at: e.target.value })} />
         <input className="input" placeholder="Опис" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+        {accounts.length > 0 && (
+          <select value={accId} onChange={e => setAccId(e.target.value)}>
+            <option value="">— без рахунку —</option>
+            {accounts.map(a => <option key={a.id} value={a.id}>З: {a.name} ({a.currency})</option>)}
+          </select>
+        )}
         <button onClick={add}>Додати витрату</button>
       </div>
 
